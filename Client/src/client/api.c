@@ -22,9 +22,22 @@ static struct Session session = {.id = -1};
 
 int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path) {
 
+  if(mkfifo(req_pipe_path, 0666) == -1) {
+    perror("Error creating request pipe");
+    exit(EXIT_FAILURE);
+  }
+
+  if(mkfifo(notif_pipe_path, 0666) == -1) {
+    perror("Error creating notification pipe");
+    unlink(req_pipe_path);
+    exit(EXIT_FAILURE);
+  }
+
   int server_pipe = open(server_pipe_path, O_WRONLY);
   if(server_pipe == -1) {
     perror("Error opening server pipe");
+    unlink(req_pipe_path);
+    unlink(notif_pipe_path);
     exit(EXIT_FAILURE);
   }
   // TODO - implement me
