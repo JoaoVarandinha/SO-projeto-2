@@ -5,16 +5,16 @@ CFLAGS += -fsanitize=thread
 LDFLAGS = -lncurses
 
 # Directory variables
-SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 INCLUDE_DIR = include
+SERVER_DIR = src
 
 # executable 
 TARGET = Pacmanist
 
 # Objects variables
-OBJS = game.o display.o board.o parser.o
+OBJS = game.o display.o board.o parser.o server_main.o
 
 # Dependencies
 display.o = display.h
@@ -23,7 +23,7 @@ parser.o = parser.h
 
 # Object files path
 vpath %.o $(OBJ_DIR)
-vpath %.c $(SRC_DIR)
+vpath %.c $(SERVER_DIR)
 
 # Make targets
 all: pacmanist

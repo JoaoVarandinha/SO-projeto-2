@@ -183,11 +183,7 @@ int play_board_threads(board_t* board) {
 }
 
 
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: %s <level_directory>\n", argv[0]);
-        return -1;
-    }
+int run_game(const char dir_name) {
 
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
@@ -201,13 +197,13 @@ int main(int argc, char** argv) {
     pid_t pid = -1;
     board_t game_board;
 
-    DIR* dir = opendir(argv[1]);
+    DIR* dir = opendir(dir_name);
     if (!dir) {
         perror("Error opening directory");
         exit(EXIT_FAILURE);
     }
 
-    strcpy(game_board.dir_name, argv[1]);
+    strcpy(game_board.dir_name, dir_name);
     
     struct dirent* entry;
     while (!end_game && (entry = readdir(dir)) != NULL) {
