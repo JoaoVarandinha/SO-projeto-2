@@ -1,11 +1,38 @@
 #include "game.h"
+#include "parser.h"
+#include "protocol.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <semaphore.h>
+
+typedef struct {
+    int id;
+    int req_pipe;
+    int notif_pipe;
+    char req_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
+    char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
+} Session;
+
+char* read_pipe_line(int pipe_fd, int* num) {
+    char pipe_instruction[MAX_PIPE_PATH_LENGTH*2 + 4];
+    char* p = pipe_instruction;
+    read_line(pipe_fd, p);
+    (*num) = p[0];
+    if (*num != 2) {
+        p += 2;
+    }
+    return p;
+}
+
+void* session_thread(void* args) {
+
+}
 
 int main (int argc, char* argv[]) {
     if (argc != 4) {
@@ -16,15 +43,42 @@ int main (int argc, char* argv[]) {
     }
     const char* levels_dir = argv[1];
     const int max_games = argv[2];
-    const char* register_pipe = argv[3];
+    const char* server_pipe_path = argv[3];
+    int current_sessions = 0;
+    sem_t *session_sem = sem_open("/session_sem", O_CREAT, 0666, 0);    
 
-    if (mkfifo(register_pipe, 0422) != 0) {
+    if (mkfifo(server_pipe_path, 0422) != 0) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
     }
 
-    int server_pipe = open(server_pipe_path, O_RDONLY);
+    
+    while (1) {
+        
+        int num = 0;
+        
+        int server_pipe_fd = open(server_pipe_path, O_RDONLY);
+        char* instruction = read_pipe_line(server_pipe_fd, &num);
+        close(server_pipe_fd);
 
+        if (num != 1) {
+            perror("Message error in server pipe");
+            exit(EXIT_FAILURE);
+        }
+
+        if (current_sessions == max_games) {
+            //FIX  ME
+        }
+
+        Session session;
+
+        sscanf(instruction, "%s %s\n", session.req_pipe_path, session.notif_pipe_path);
+
+        session.req_pipe = open(session.req_pipe_path, O_RDONLY);
+        session.notif_pipe = open(session.notif_pipe_path, O_WRONLY);
+
+
+    }
     
 
     return 0;
