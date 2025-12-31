@@ -19,6 +19,18 @@ typedef struct {
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
 } Session;
 
+
+
+typedef struct {
+    const char* levels_dir;
+    const int max_games;
+    const char* server_pipe_path;
+    sem_t session_sem;
+    Session* all_sessions;
+} Session_manager;
+
+static Session_manager manager;
+
 char* read_pipe_line(int pipe_fd, int* num) {
     char pipe_instruction[MAX_PIPE_PATH_LENGTH*2 + 4];
     char* p = pipe_instruction;
@@ -28,6 +40,14 @@ char* read_pipe_line(int pipe_fd, int* num) {
         p += 2;
     }
     return p;
+}
+
+void open_session(Session_manager* manager) {
+    for (int i = 0; i < manager->max_games; i++) {
+        if (manager->all_sessions[i].id == 0) {
+            return i + 1;
+        }
+    }
 }
 
 void* session_thread(void* args) {
@@ -45,16 +65,22 @@ int main (int argc, char* argv[]) {
     const int max_games = argv[2];
     const char* server_pipe_path = argv[3];
     int current_sessions = 0;
-    sem_t *session_sem = sem_open("/session_sem", O_CREAT, 0666, 0);    
+    sem_init(&manager.session_sem, 0, max_games);
+    Session* all_sessions = calloc(max_games, sizeof(Session));
 
     if (mkfifo(server_pipe_path, 0422) != 0) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
     }
 
-    
     while (1) {
         
+        sem_wait(&manager.session_sem);
+
+        if (0) { //END
+        
+        }
+
         int num = 0;
         
         int server_pipe_fd = open(server_pipe_path, O_RDONLY);
@@ -76,10 +102,18 @@ int main (int argc, char* argv[]) {
 
         session.req_pipe = open(session.req_pipe_path, O_RDONLY);
         session.notif_pipe = open(session.notif_pipe_path, O_WRONLY);
+        
+        char buf[3];
 
+        if (session.req_pipe == 0 && session.notif_pipe == 0) {
+            sprintf(buf, "%s %s", OP_CODE_CONNECT, 0);
+        } else {
+            sprintf(buf, "%s %s", OP_CODE_CONNECT, 1);
+        }
+
+        write(session.notif_pipe, buf, 3);
 
     }
-    
 
     return 0;
 }
