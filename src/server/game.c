@@ -20,12 +20,6 @@ typedef struct {
     int ghost_idx;
 } ghost_thread_args;
 
-void screen_refresh(board_t * game_board, int mode) {
-    debug("REFRESH\n");
-    draw_board(game_board, mode);
-    refresh_screen();
-}
-
 int pacman_alive(board_t* board) {
     pacman_t* pacman = &board->pacmans[0];
     pthread_mutex_lock(&pacman->pac_lock);
@@ -47,7 +41,6 @@ void *display_thread(void* arg) {
             pthread_rwlock_unlock(&board->board_lock);
             pthread_exit(NULL);
         }
-        screen_refresh(board, DRAW_MENU);
         pthread_rwlock_unlock(&board->board_lock);
     }
 }
@@ -60,7 +53,7 @@ void *pacman_thread(void* arg) {
 
     while (true) {
         if (!pacman_alive(board)) {
-            *play_result = LOAD_BACKUP;
+            *play_result = QUIT_GAME;
             return (void*) play_result;
         }
 
@@ -91,12 +84,6 @@ void *pacman_thread(void* arg) {
             return (void*) play_result;
         }
 
-        if (play->command == 'G') {
-            pacman->current_move++;
-            *play_result = CREATE_BACKUP;
-            return (void*) play_result;
-        }
-
         pthread_rwlock_rdlock(&board->board_lock);
 
         int result = move_pacman(board, 0, play);
@@ -108,7 +95,7 @@ void *pacman_thread(void* arg) {
         }
 
         if (result == DEAD_PACMAN) {
-            *play_result = LOAD_BACKUP;
+            *play_result = QUIT_GAME;
             break;
         }
         pthread_rwlock_unlock(&board->board_lock);
@@ -194,7 +181,6 @@ int run_game(const char dir_name) {
     
     int accumulated_points = 0;
     bool end_game = false;
-    pid_t pid = -1;
     board_t game_board;
 
     DIR* dir = opendir(dir_name);
@@ -213,66 +199,20 @@ int run_game(const char dir_name) {
         load_level(&game_board, entry->d_name);
         load_pacman(&game_board,accumulated_points);
         load_ghosts(&game_board);
-        
-        draw_board(&game_board, DRAW_MENU);
-        refresh_screen();
 
         while (true) {
 
             int result = play_board_threads(&game_board);
 
             if (result == NEXT_LEVEL) {
-                screen_refresh(&game_board, DRAW_WIN);
                 sleep_ms(game_board.tempo);
                 break;
-            }
-
-            if (result == LOAD_BACKUP) {
-                if (pid == 0) {
-                    unload_level(&game_board);
-                    exit(LOAD_BACKUP);
-                } else {
-                    result = QUIT_GAME;
-                }
             }
 
             if (result == QUIT_GAME) {
-                if (pid == 0) {
-                    unload_level(&game_board);
-                    exit(QUIT_GAME);
-                }
-                screen_refresh(&game_board, DRAW_GAME_OVER); 
                 sleep_ms(game_board.tempo);
                 end_game = true;
                 break;
-            }
-
-            if (result == CREATE_BACKUP) {
-                if (pid != 0) {
-                    pid = fork();
-                    if (pid == -1) {
-                            perror("Error forking");
-                            exit(EXIT_FAILURE);
-                    } else if (pid == 0) {
-                        screen_refresh(&game_board, DRAW_MENU);
-                        continue;
-                    } else {
-                        int status;
-                        wait(&status);
-                        if (WIFEXITED(status)) {
-                            if (WEXITSTATUS(status) == QUIT_GAME) {
-                                end_game = true;
-                                break; 
-                            } else if (WEXITSTATUS(status) == LOAD_BACKUP) {
-                                screen_refresh(&game_board, DRAW_MENU);
-                                continue;
-                            }
-                        } else {
-                            perror("Error waiting for child");
-                            exit(EXIT_FAILURE);
-                        }
-                    }
-                }
             }
         }
 
@@ -282,8 +222,6 @@ int run_game(const char dir_name) {
     unload_level(&game_board);
 
     }
-
-    if (pid == 0) exit(QUIT_GAME);
 
     closedir(dir);
 

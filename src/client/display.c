@@ -311,7 +311,6 @@ char get_input() {
         case 'A':
         case 'D':
         case 'Q':
-        case 'G':
 
             return (char)ch;
         

@@ -67,7 +67,7 @@ void process_instruction(board_t* board, char* instruction, char* filetype, int*
     }
 }
 
-void process_level_instruction(board_t* board, char* instruction, int* num) {
+void prosrc/commoncess_level_instruction(board_t* board, char* instruction, int* num) {
     switch (instruction[0]) {
         case 'D': {
             sscanf(instruction, "DIM %d %d", &board->width, &board->height);

@@ -10,6 +10,7 @@ BIN_DIR = bin
 INCLUDE_DIR = include
 CLIENT_DIR = src/client
 SERVER_DIR = src/server
+COMMON_DIR = src/common
 
 # executable 
 TARGET = Pacmanist
@@ -20,12 +21,18 @@ CLIENT = client
 #server
 SERVER = server
 
+#common
+COMMON = common
+
 
 #Client objects
 OBJS_CLIENT = client_main.o debug.o api.o display.o
 
 #Server objects
-OBJS_SERVER = server_main.o board.o game.o parser.o
+OBJS_SERVER = server_main.o board.o game.o
+
+#Common objects
+OBJS_COMMON = parser.o
 
 # Dependencies
 display.o = display.h
@@ -33,29 +40,30 @@ board.o = board.h
 parser.o = parser.h
 api.o = api.h protocol.h
 game.o = game.h
+debug.o = debug.h
 
 # Object files path
 vpath %.o $(OBJ_DIR)
 vpath %.c $(CLIENT_DIR) $(INCLUDE_DIR)
 vpath %.c $(SERVER_DIR) $(INCLUDE_DIR)
+vpath %.c $(COMMON_DIR) $(INCLUDE_DIR)
 
 # Make targets
 all: client server
 
 client: $(BIN_DIR)/$(CLIENT)
 
-$(BIN_DIR)/$(CLIENT): $(OBJS_CLIENT) | folders
-	$(CC) $(CFLAGS) $(addprefix $(OBJ_DIR)/,$(OBJS_CLIENT)) -o $@ $(LDFLAGS)
+$(BIN_DIR)/$(CLIENT): $(OBJS_CLIENT) $(OBJS_COMMON) | folders
+	$(CC) $(CFLAGS) $(addprefix $(OBJ_DIR)/,$(OBJS_CLIENT) $(OBJS_COMMON)) -o $@ $(LDFLAGS)
+
+server: $(BIN_DIR)/$(SERVER)
+
+$(BIN_DIR)/$(SERVER): $(OBJS_SERVER) $(OBJS_COMMON)| folders
+	$(CC) $(CFLAGS) $(addprefix $(OBJ_DIR)/,$(OBJS_SERVER) $(OBJS_COMMON)) -o $@ $(LDFLAGS)
 
 # dont include LDFLAGS in the end, to allow compilation on macos
 %.o: %.c $($@) | folders
 	$(CC) -I $(INCLUDE_DIR) $(CFLAGS) -o $(OBJ_DIR)/$@ -c $<
-
-server: $(BIN_DIR)/$(SERVER)
-
-$(BIN_DIR)/$(SERVER): $(OBJS_SERVER) | folders
-	$(CC) $(CFLAGS) $(addprefix $(OBJ_DIR)/,$(OBJS_SERVER)) -o $@ $(LDFLAGS)
-
 # Create folders
 folders:
 	mkdir -p $(OBJ_DIR)
