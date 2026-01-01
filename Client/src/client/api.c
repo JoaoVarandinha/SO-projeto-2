@@ -18,18 +18,6 @@ typedef struct {
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
 } Session;
 
-/*
-struct Connect_request {
-  char op_code;
-  char req_pipe_name[MAX_PIPE_NAME];
-  char notif_pipe_name[MAX_PIPE_NAME];   
-};
-
-struct Connect_response {
-  char op_code;
-  char result;
-};
-*/
 
 static Session session = {.id = -1};
 
@@ -113,6 +101,13 @@ int pacman_disconnect() {
     return 0;
 }
 
-Board receive_board_update(void) {
+int receive_board_updates(char* tabuleiro) {
+
+    char buf;
+    read_line(session.notif_pipe, buf);
+
+    if (buf[0] != OP_CODE_BOARD) {
+        exit(EXIT_FAILURE);
+    }
     // TODO - implement me
 }

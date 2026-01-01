@@ -17,41 +17,67 @@ typedef struct {
     int notif_pipe;
     char req_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
+    int running; // 0 if stopped, 1 if active
+    sem_t session_sem;
+    pthread_mutex_t session_lock;
 } Session;
-
 
 
 typedef struct {
     const char* levels_dir;
-    const int max_games;
+    int max_games;
     const char* server_pipe_path;
-    sem_t session_sem;
+    int ongoing_sessions;
+    sem_t server_sem;
+    pthread_mutex_t server_lock;
     Session* all_sessions;
-} Session_manager;
+} Server_manager;
 
-static Session_manager manager;
 
-char* read_pipe_line(int pipe_fd, int* num) {
-    char pipe_instruction[MAX_PIPE_PATH_LENGTH*2 + 4];
-    char* p = pipe_instruction;
-    read_line(pipe_fd, p);
-    (*num) = p[0];
-    if (*num != 2) {
-        p += 2;
-    }
-    return p;
-}
+static Server_manager manager;
 
-void open_session(Session_manager* manager) {
-    for (int i = 0; i < manager->max_games; i++) {
-        if (manager->all_sessions[i].id == 0) {
-            return i + 1;
+Session* find_open_session() {
+    for (int i = 0; i < manager.max_games; i++) {
+        if (manager.all_sessions[i].running == 0) {
+            return &manager.all_sessions[i];
         }
     }
+    perror("Error finding an open session");
+    exit(EXIT_FAILURE);
 }
 
-void* session_thread(void* args) {
+int check_ongoing_sessions() {
+    pthread_mutex_lock(&manager.server_lock);
+    int i = manager.ongoing_sessions;
+    pthread_mutex_unlock(&manager.server_lock);
+    return i;
+}
 
+void change_ongoing_sessions(int i) {
+    pthread_mutex_lock(&manager.server_lock);
+    manager.ongoing_sessions += i;
+    pthread_mutex_unlock(&manager.server_lock);
+}
+
+void* session_thread(void* arg) {
+    Session* session = (Session*) arg;
+    sem_init(&session->session_sem, 0, 0);
+    pthread_mutex_init(&session->session_lock, NULL);
+
+    while (1) {
+        sem_wait(&session->session_sem);
+        change_ongoing_sessions(1);
+        session->running = 1;
+
+        session->running = 0;
+        change_ongoing_sessions(-1);
+        sem_post(&manager.server_sem);
+    }
+
+    sem_destroy(&session->session_sem);
+    pthread_mutex_destroy(&session->session_lock);
+
+    return NULL;
 }
 
 int main (int argc, char* argv[]) {
@@ -61,59 +87,78 @@ int main (int argc, char* argv[]) {
             argv[0]);
         return 1;
     }
-    const char* levels_dir = argv[1];
-    const int max_games = argv[2];
-    const char* server_pipe_path = argv[3];
-    int current_sessions = 0;
-    sem_init(&manager.session_sem, 0, max_games);
-    Session* all_sessions = calloc(max_games, sizeof(Session));
 
-    if (mkfifo(server_pipe_path, 0422) != 0) {
+    manager.levels_dir = argv[1];
+    manager.max_games = argv[2];
+    manager.server_pipe_path = argv[3];
+    manager.ongoing_sessions = 0;
+    sem_init(&manager.server_sem, 0, manager.max_games);
+    pthread_mutex_init(&manager.server_lock, NULL);
+    manager.all_sessions = calloc(manager.max_games, sizeof(Session));
+
+    if (mkfifo(manager.server_pipe_path, 0422) != 0) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
     }
 
+    pthread_t session_tid[manager.max_games];
+
+    for (int i = 0; i < manager.max_games; i++) {
+        manager.all_sessions[i].id = i + 1;
+        pthread_create(&session_tid[i], NULL, session_thread, &manager.all_sessions[i]);
+    }
+
+
     while (1) {
         
-        sem_wait(&manager.session_sem);
+        sem_wait(&manager.server_sem);
 
         if (0) { //END
-        
+            break;
         }
 
-        int num = 0;
-        
-        int server_pipe_fd = open(server_pipe_path, O_RDONLY);
-        char* instruction = read_pipe_line(server_pipe_fd, &num);
+        if (check_ongoing_sessions() == manager.max_games) {
+            perror("Error creating session with no available slots");
+            exit(EXIT_FAILURE);
+        }
+
+        int server_pipe_fd = open(manager.server_pipe_path, O_RDONLY);
+        char* instruction[MAX_PIPE_PATH_LENGTH*2 + 4];
+        read_line(server_pipe_fd, instruction);
         close(server_pipe_fd);
 
-        if (num != 1) {
+        if (instruction[0] != 1) {
             perror("Message error in server pipe");
             exit(EXIT_FAILURE);
         }
 
-        if (current_sessions == max_games) {
-            //FIX  ME
-        }
+        Session* session = find_open_session();
 
-        Session session;
+        sscanf(instruction, "1 %s %s\n", session->req_pipe_path, session->notif_pipe_path);
 
-        sscanf(instruction, "%s %s\n", session.req_pipe_path, session.notif_pipe_path);
+        session->req_pipe = open(session->req_pipe_path, O_RDONLY);
+        session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
 
-        session.req_pipe = open(session.req_pipe_path, O_RDONLY);
-        session.notif_pipe = open(session.notif_pipe_path, O_WRONLY);
-        
         char buf[3];
 
-        if (session.req_pipe == 0 && session.notif_pipe == 0) {
-            sprintf(buf, "%s %s", OP_CODE_CONNECT, 0);
+        if (session->req_pipe == 0 && session->notif_pipe == 0) {
+            sprintf(buf, "%s %s\n", OP_CODE_CONNECT, 0);
+            sem_post(&session->session_sem);
         } else {
-            sprintf(buf, "%s %s", OP_CODE_CONNECT, 1);
+            sprintf(buf, "%s %s\n", OP_CODE_CONNECT, 1);
         }
 
-        write(session.notif_pipe, buf, 3);
+        write(session->notif_pipe, buf, 3);
 
     }
+
+
+    for (int i = 0; i < manager.max_games; i++) {
+        pthread_join(&session_tid[i], NULL);
+    }
+    sem_destroy(&manager.server_sem);
+    pthread_mutex_destroy(&manager.server_lock);
+    free(manager.all_sessions);
 
     return 0;
 }

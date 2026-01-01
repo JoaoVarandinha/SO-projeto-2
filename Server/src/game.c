@@ -35,7 +35,7 @@ int pacman_alive(board_t* board) {
 }
 
 void *display_thread(void* arg) {
-    board_t *board = (board_t*)arg;
+    board_t* board = (board_t*)arg;
     
     sleep_ms(board->tempo / 2);
 
