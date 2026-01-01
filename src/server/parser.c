@@ -130,7 +130,7 @@ void process_pacman_instruction(board_t* board, char* instruction) {
             }
             exit(EXIT_FAILURE);
         }
-
+        /* A leitura de movimentos é feita no cliente
         default: {
             command_t cmd;
             cmd.command = instruction[0];
@@ -143,7 +143,7 @@ void process_pacman_instruction(board_t* board, char* instruction) {
             pac->moves[pac->n_moves++] = cmd;
 
             return;
-        }
+        } */
     }
 }
 

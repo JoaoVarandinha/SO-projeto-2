@@ -65,11 +65,31 @@ void* session_thread(void* arg) {
     pthread_mutex_init(&session->session_lock, NULL);
 
     while (1) {
+        if (0) { //END
+            break;
+        }
         sem_wait(&session->session_sem);
         change_ongoing_sessions(1);
+        pthread_mutex_lock(&session->session_lock);
         session->running = 1;
+        pthread_mutex_unlock(&session->session_lock);
 
+        while (1) {
+            char instruction[MAX_INSTRUCTION_LENGTH];
+            read_line(session->req_pipe, instruction);
+
+            if (instruction[0] == OP_CODE_DISCONNECT) break;
+
+            else if(instruction[0] == OP_CODE_PLAY) {
+
+            } else if(instruction[0] == OP_CODE_BOARD) {
+
+            }
+        }
+
+        pthread_mutex_lock(&session->session_lock);
         session->running = 0;
+        pthread_mutex_unlock(&session->session_lock);
         change_ongoing_sessions(-1);
         sem_post(&manager.server_sem);
     }

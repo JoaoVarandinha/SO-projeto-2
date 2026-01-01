@@ -20,6 +20,7 @@ typedef struct {
 
 
 static Session session = {.id = -1};
+static Board board;
 
 int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path) {
 
@@ -102,12 +103,26 @@ int pacman_disconnect() {
 }
 
 int receive_board_updates(char* tabuleiro) {
+  
 
-    char buf;
-    read_line(session.notif_pipe, buf);
+    char op_code;
 
+    if (read(session.notif_pipe, &op_code, 1) != 1) exit(EXIT_FAILURE);
+
+    if (op_code != OP_CODE_BOARD) exit(EXIT_FAILURE);
+
+
+
+    if (read(session.notif_pipe, &board.width, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
+
+    +
+    
+    
+    
     if (buf[0] != OP_CODE_BOARD) {
         exit(EXIT_FAILURE);
     }
+
+    sscanf(buf, "4 %d %d %d %d %d %d %s", board.width, board.height, board.tempo, board.victory, board.game_over, board.accumulated_points, board.data);
     // TODO - implement me
 }
