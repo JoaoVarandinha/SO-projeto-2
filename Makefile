@@ -51,10 +51,10 @@ $(BIN_DIR)/$(CLIENT): $(OBJS_CLIENT) | folders
 %.o: %.c $($@) | folders
 	$(CC) -I $(INCLUDE_DIR) $(CFLAGS) -o $(OBJ_DIR)/$@ -c $<
 
-server :(BIN_DIR)/$(SERVER)
+server: $(BIN_DIR)/$(SERVER)
 
-$(BIN_DIR)/$(TARGET): $(OBJS_SERVER) | folders
-	$(CC) $(CFLAGS) $(SLEEP) $(addprefix $(OBJ_DIR)/,$(OBJS_SERVER)) -o $@ $(LDFLAGS)
+$(BIN_DIR)/$(SERVER): $(OBJS_SERVER) | folders
+	$(CC) $(CFLAGS) $(addprefix $(OBJ_DIR)/,$(OBJS_SERVER)) -o $@ $(LDFLAGS)
 
 # Create folders
 folders:
