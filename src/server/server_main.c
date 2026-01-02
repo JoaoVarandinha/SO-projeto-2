@@ -92,7 +92,7 @@ int main (int argc, char* argv[]) {
         perror("Error allocating memory to manager");
         exit(EXIT_FAILURE);
     }
-
+    unlink(manager.server_pipe_path);
     if (mkfifo(manager.server_pipe_path, 0666) != 0) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
@@ -114,6 +114,7 @@ int main (int argc, char* argv[]) {
         }
 
         if (check_ongoing_sessions() == manager.max_games) {
+            unlink(manager.server_pipe_path);
             perror("Error creating session with no available slots");
             exit(EXIT_FAILURE);
         }
@@ -126,6 +127,10 @@ int main (int argc, char* argv[]) {
         char op_code;
         read_char(server_pipe_fd, &op_code, sizeof(char));
 
+        if (op_code != OP_CODE_CONNECT) {
+            perror("Error wrong op code in server pipe");
+            exit(EXIT_FAILURE);
+        }
         read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH);
         read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH);
 
@@ -156,6 +161,7 @@ int main (int argc, char* argv[]) {
     sem_destroy(&manager.server_sem);
     pthread_mutex_destroy(&manager.server_lock);
     free(manager.all_sessions);
+    unlink(manager.server_pipe_path);
 
     return 0;
 }

@@ -46,9 +46,10 @@ ssize_t read_char(int fd, char* buf, int bytes) {
 
     while (total_read < bytes) {
         n = read(fd, &c, 1);
+        if (c == '\0') break;
         buf[total_read++] = c;
         
-        if (n == 0) continue;
+        if (n == 0) break;
         if (n == -1) {
             perror("Error reading char from file");
             exit(EXIT_FAILURE);
@@ -73,7 +74,7 @@ ssize_t read_int(int fd, int* buf) {
 
     while (total_read < (ssize_t)sizeof(int)) {
         n = read(fd, c + total_read, sizeof(int) - total_read);
-        if (n == 0) continue;
+        if (n == 0) break;
         if (n == -1) {
             perror("Error reading in from file");
             exit(EXIT_FAILURE);
