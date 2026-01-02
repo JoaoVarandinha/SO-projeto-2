@@ -11,32 +11,9 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-typedef struct {
-    int id;
-    int req_pipe;
-    int notif_pipe;
-    char req_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
-    char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
-    int running; // 0 if stopped, 1 if active
-    sem_t session_sem;
-    pthread_mutex_t session_lock;
-} Session;
-
-
-typedef struct {
-    const char* levels_dir;
-    int max_games;
-    const char* server_pipe_path;
-    int ongoing_sessions;
-    sem_t server_sem;
-    pthread_mutex_t server_lock;
-    Session* all_sessions;
-} Server_manager;
-
-
 static Server_manager manager;
 
-Session* find_open_session() {
+Server_session* find_open_session() {
     for (int i = 0; i < manager.max_games; i++) {
         if (manager.all_sessions[i].running == 0) {
             return &manager.all_sessions[i];
@@ -60,7 +37,7 @@ void change_ongoing_sessions(int i) {
 }
 
 void* session_thread(void* arg) {
-    Session* session = (Session*) arg;
+    Server_session* session = (Server_session*) arg;
     sem_init(&session->session_sem, 0, 0);
     pthread_mutex_init(&session->session_lock, NULL);
 
@@ -114,7 +91,7 @@ int main (int argc, char* argv[]) {
     manager.ongoing_sessions = 0;
     sem_init(&manager.server_sem, 0, manager.max_games);
     pthread_mutex_init(&manager.server_lock, NULL);
-    manager.all_sessions = calloc(manager.max_games, sizeof(Session));
+    manager.all_sessions = calloc(manager.max_games, sizeof(Server_session));
 
     if (mkfifo(manager.server_pipe_path, 0422) != 0) {
         perror("Error creating named pipe");
@@ -152,7 +129,7 @@ int main (int argc, char* argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        Session* session = find_open_session();
+        Server_session* session = find_open_session();
 
         sscanf(instruction, "1 %s %s\n", session->req_pipe_path, session->notif_pipe_path);
 

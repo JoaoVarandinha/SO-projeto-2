@@ -114,8 +114,7 @@ int receive_board_updates(char* tabuleiro) {
 
 
     if (read(session.notif_pipe, &board.width, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
-
-    +
+    
     
     
     

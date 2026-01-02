@@ -39,6 +39,33 @@ int read_line(int fd, char* buf) {
     }
 }
 
+int read_bytes(int fd, char* buf, int bytes) {
+    char c;
+    ssize_t n;
+
+    while (1) {
+        int i = 0;
+
+        while ((n = read(fd, &c, 1)) == 1 && i < bytes) {
+            buf[i++] = c;
+        }
+
+        if (n == -1) {
+            perror("Error reading file");
+            exit(EXIT_FAILURE);
+        };
+
+        if (n == 0 && i == 0) return 0;
+
+        // skip empty lines
+        if (i == 0) continue;
+        
+        buf[i] = '\0';
+
+        return i;
+    }
+}
+
 void read_file(board_t* board, char* filename, char* filetype, int num) {
     //Go to correct directory and find the file before opening it
     char dirfilename[MAX_FILENAME + MAX_FILENAME];
@@ -67,7 +94,7 @@ void process_instruction(board_t* board, char* instruction, char* filetype, int*
     }
 }
 
-void prosrc/commoncess_level_instruction(board_t* board, char* instruction, int* num) {
+void process_level_instruction(board_t* board, char* instruction, int* num) {
     switch (instruction[0]) {
         case 'D': {
             sscanf(instruction, "DIM %d %d", &board->width, &board->height);

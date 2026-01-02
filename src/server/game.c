@@ -1,5 +1,7 @@
 #include "board.h"
 #include "display.h"
+#include "protocol.h"
+#include "game.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -26,23 +28,6 @@ int pacman_alive(board_t* board) {
     int status = pacman->alive;
     pthread_mutex_unlock(&pacman->pac_lock);
     return status;
-}
-
-void *display_thread(void* arg) {
-    board_t* board = (board_t*)arg;
-    
-    sleep_ms(board->tempo / 2);
-
-    while (true) {
-        sleep_ms(board->tempo);
-
-        pthread_rwlock_wrlock(&board->board_lock);
-        if (board->shutdown_threads) {
-            pthread_rwlock_unlock(&board->board_lock);
-            pthread_exit(NULL);
-        }
-        pthread_rwlock_unlock(&board->board_lock);
-    }
 }
 
 void *pacman_thread(void* arg) {
@@ -78,11 +63,6 @@ void *pacman_thread(void* arg) {
         }
 
         debug("KEY %c\n", play->command);
-
-        if (play->command == 'Q') {
-            *play_result = QUIT_GAME;
-            return (void*) play_result;
-        }
 
         pthread_rwlock_rdlock(&board->board_lock);
 
@@ -135,11 +115,10 @@ void *ghost_thread(void* arg) {
 }
 
 int play_board_threads(board_t* board) {
-    pthread_t display_tid, pac_tid, ghost_tid[MAX_GHOSTS];
+    pthread_t pac_tid, ghost_tid[MAX_GHOSTS];
 
     board->shutdown_threads = 0;
 
-    pthread_create(&display_tid, NULL, display_thread, board);
     pthread_create(&pac_tid, NULL, pacman_thread, board);
     for (int i = 0; i < board->n_ghosts; i++) {
         ghost_thread_args* args = calloc(1, sizeof(*args));
@@ -157,8 +136,7 @@ int play_board_threads(board_t* board) {
     board->shutdown_threads = 1;
     pthread_rwlock_unlock(&board->board_lock);
 
-    
-    pthread_join(display_tid, NULL);
+
     for (int i = 0; i < board->n_ghosts; i++) {
         pthread_join(ghost_tid[i], NULL);
     }
@@ -170,7 +148,7 @@ int play_board_threads(board_t* board) {
 }
 
 
-int run_game(const char dir_name) {
+int run_game(Server_session* session, char levels_dir) {
 
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
@@ -181,42 +159,42 @@ int run_game(const char dir_name) {
     
     int accumulated_points = 0;
     bool end_game = false;
-    board_t game_board;
+    board_t* game_board = &session->board;
+    
+    strcpy(game_board->dir_name, levels_dir);
 
-    DIR* dir = opendir(dir_name);
+    DIR* dir = opendir(game_board->dir_name);
     if (!dir) {
         perror("Error opening directory");
         exit(EXIT_FAILURE);
     }
 
-    strcpy(game_board.dir_name, dir_name);
-    
     struct dirent* entry;
     while (!end_game && (entry = readdir(dir)) != NULL) {
         int len = strlen(entry->d_name);
         if (len <= 4 || strcmp(entry->d_name + len - 4, LEVEL) != 0) continue;
 
-        load_level(&game_board, entry->d_name);
-        load_pacman(&game_board,accumulated_points);
-        load_ghosts(&game_board);
+        load_level(game_board, entry->d_name);
+        load_pacman(game_board,accumulated_points);
+        load_ghosts(game_board);
 
         while (true) {
 
             int result = play_board_threads(&game_board);
 
             if (result == NEXT_LEVEL) {
-                sleep_ms(game_board.tempo);
+                sleep_ms(game_board->tempo);
                 break;
             }
 
             if (result == QUIT_GAME) {
-                sleep_ms(game_board.tempo);
+                sleep_ms(game_board->tempo);
                 end_game = true;
                 break;
             }
         }
 
-    accumulated_points = game_board.pacmans[0].points;
+    accumulated_points = game_board->pacmans[0].points;
 
     print_board(&game_board);
     unload_level(&game_board);
