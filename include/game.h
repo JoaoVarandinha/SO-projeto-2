@@ -26,6 +26,6 @@ typedef struct {
     Server_session* all_sessions;
 } Server_manager;
 
-int run_game(const char dir_name);
+int run_game(Server_session* session, char levels_dir);
 
 #endif

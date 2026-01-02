@@ -5,7 +5,6 @@
 #define MAX_INSTRUCTION_LENGTH 256
 
 int read_line(int fd, char* buf);
-int read_bytes(int fd, char* buf, int bytes);
 void read_file(board_t* board, char* filename, char* filetype, int num);
 void process_instruction(board_t* board, char* instruction, char* filetype, int* num);
 void process_level_instruction(board_t* board, char* instruction, int* num);

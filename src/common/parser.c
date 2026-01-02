@@ -1,4 +1,5 @@
 #include "board.h"
+#include "game.h"
 #include "parser.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,30 +40,17 @@ int read_line(int fd, char* buf) {
     }
 }
 
-int read_bytes(int fd, char* buf, int bytes) {
-    char c;
-    ssize_t n;
+int read_request_pipe(Server_session* session, char* buf) {
+    char buf[1];
+    read()
 
-    while (1) {
-        int i = 0;
+    switch (buf[0]) {
+        case '2': { //disconnect
 
-        while ((n = read(fd, &c, 1)) == 1 && i < bytes) {
-            buf[i++] = c;
         }
+        case '3': { //move_pacman
 
-        if (n == -1) {
-            perror("Error reading file");
-            exit(EXIT_FAILURE);
-        };
-
-        if (n == 0 && i == 0) return 0;
-
-        // skip empty lines
-        if (i == 0) continue;
-        
-        buf[i] = '\0';
-
-        return i;
+        }
     }
 }
 

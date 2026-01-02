@@ -2,6 +2,7 @@
 #include "display.h"
 #include "protocol.h"
 #include "game.h"
+#include "parser.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -30,8 +31,27 @@ int pacman_alive(board_t* board) {
     return status;
 }
 
-void *pacman_thread(void* arg) {
+void *display_thread(void* arg) {
     board_t* board = (board_t*)arg;
+    
+    sleep_ms(board->tempo / 2);
+
+    while (true) {
+        sleep_ms(board->tempo);
+
+        pthread_rwlock_wrlock(&board->board_lock);
+        if (board->shutdown_threads) {
+            pthread_rwlock_unlock(&board->board_lock);
+            pthread_exit(NULL);
+        }
+        //SEND BOARD UPDATE HERE
+        pthread_rwlock_unlock(&board->board_lock);
+    }
+}
+
+void *pacman_thread(void* arg) {
+    Server_session* session = (Server_session*)arg;
+    board_t* board = &session->board;
     pacman_t* pacman = &board->pacmans[0];
 
     int *play_result = malloc(sizeof(int));
@@ -42,25 +62,11 @@ void *pacman_thread(void* arg) {
             return (void*) play_result;
         }
 
-        sleep_ms(board->tempo);
-
         command_t* play;
         command_t c;
-        if (pacman->n_moves == 0) { // if is user input
 
-            c.command = get_input();
-
-            if(c.command == '\0') {
-                continue;
-            }
-
-            c.turns = 1;
-            play = &c;
-        } else { // else if the moves are pre-defined in the file
-            // avoid buffer overflow wrapping around with modulo of n_moves
-            // this ensures that we always access a valid move for the pacman
-            play = &pacman->moves[pacman->current_move%pacman->n_moves];
-        }
+        char buf[3];
+        // NORMAL READ HERE
 
         debug("KEY %c\n", play->command);
 
@@ -114,12 +120,15 @@ void *ghost_thread(void* arg) {
     }
 }
 
-int play_board_threads(board_t* board) {
-    pthread_t pac_tid, ghost_tid[MAX_GHOSTS];
+int play_board_threads(Server_session* session) {
+    board_t* board = &session->board;
+
+    pthread_t display_tid, pac_tid, ghost_tid[MAX_GHOSTS];
 
     board->shutdown_threads = 0;
 
-    pthread_create(&pac_tid, NULL, pacman_thread, board);
+    pthread_create(&display_tid, NULL, display_thread, board);
+    pthread_create(&pac_tid, NULL, pacman_thread, session);
     for (int i = 0; i < board->n_ghosts; i++) {
         ghost_thread_args* args = calloc(1, sizeof(*args));
 
@@ -136,7 +145,7 @@ int play_board_threads(board_t* board) {
     board->shutdown_threads = 1;
     pthread_rwlock_unlock(&board->board_lock);
 
-
+    pthread_join(display_tid, NULL);
     for (int i = 0; i < board->n_ghosts; i++) {
         pthread_join(ghost_tid[i], NULL);
     }
