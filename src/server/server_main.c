@@ -101,7 +101,6 @@ int main (int argc, char* argv[]) {
     pthread_t session_tid[manager.max_games];
 
     for (int i = 0; i < manager.max_games; i++) {
-        manager.all_sessions[i].id = i + 1;
         pthread_create(&session_tid[i], NULL, session_thread, &manager.all_sessions[i]);
     }
 
@@ -132,6 +131,7 @@ int main (int argc, char* argv[]) {
 
         close(server_pipe_fd);
 
+        sscanf(session->req_pipe_path, "/tmp/%d_request", &session->id);
 
         session->req_pipe = open(session->req_pipe_path, O_RDONLY);
         session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
