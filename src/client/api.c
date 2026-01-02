@@ -19,6 +19,17 @@ typedef struct {
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
 } Session;
 
+typedef struct {
+    char op_code;
+    char req_pipe_path[MAX_PIPE_PATH_LENGTH];
+    char notif_pipe_path[MAX_PIPE_PATH_LENGTH];
+}Pac_Connect_req_pipe;
+
+
+typedef struct {
+    char op_code;
+    char command;
+}Pac_Play_req_pipe;
 
 static Session session = {.id = -1};
 static Board board;
@@ -45,24 +56,29 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
         exit(EXIT_FAILURE);
     }
 
-    //CHANGE
-    char buf[MAX_PIPE_PATH_LENGTH*2 + 4];
-    sprintf(buf, "%s %s %s\n", OP_CODE_CONNECT, req_pipe_path, notif_pipe_path);
-    
-    ssize_t bytes = write(server_pipe_path, buf, sizeof(buf));
-    close(server_pipe);
-    if(bytes != sizeof(buf)) {
-        perror("Error writing to server pipe");
+    Pac_Connect_req_pipe connect_req_pipe;
+
+    connect_req_pipe.op_code = OP_CODE_CONNECT;
+    strcpy(connect_req_pipe.req_pipe_path, req_pipe_path);
+    strcpy(connect_req_pipe.notif_pipe_path, notif_pipe_path);
+
+    if (write(server_pipe_path, connect_req_pipe, sizeof(connect_req_pipe)) != sizeof(connect_req_pipe)) {
+        perror("Error writing to server pipe - connect");
         unlink(req_pipe_path);
         unlink(notif_pipe_path);
         exit(EXIT_FAILURE);
     }
+
+    
+    close(server_pipe);
   
     strcpy(session.req_pipe_path, req_pipe_path);
     strcpy(session.notif_pipe_path, notif_pipe_path);
     session.req_pipe = open(session.req_pipe_path, O_WRONLY);
     session.notif_pipe = open(session.notif_pipe_path, O_RDONLY);
 
+
+    //FIX ME
     read(session.notif_pipe_path, buf, 3);
 
     if (buf[0] != OP_CODE_CONNECT) {
@@ -74,18 +90,15 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 }
 
 void pacman_play(char command) {
-    char buf[3];
-    sprintf(buf, "%s %s\n", OP_CODE_PLAY, command);
+    Pac_Play_req_pipe play_req_pipe;
 
-    ssize_t bytes = write(session.req_pipe, buf, sizeof(buf));
-    if(bytes != sizeof(buf)) {
-        perror("Error writing to request pipe");
-        exit(EXIT_FAILURE);
+    play_req_pipe.op_code = OP_CODE_PLAY;
+    play_req_pipe.command = command;
+    
+    if(write(session.req_pipe, &play_req_pipe, sizeof(play_req_pipe)) != sizeof(play_req_pipe)) {
+        perror("Error writing to request pipe - play");
+        exit(EXIT_FAILURE)
     }
-
-
-    // TODO - implement me
-
 }
 
 int pacman_disconnect() {
@@ -109,23 +122,42 @@ Board receive_board_update(void) {
     if (op_code != OP_CODE_BOARD) exit(EXIT_FAILURE);
 
     if (read(session.notif_pipe, &board.width, sizeof(int)) != sizeof(int)) {
+        perror("Error reading board width");
         exit(EXIT_FAILURE);
     }
 
-    if (read(session.notif_pipe, &board.height, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
+    if (read(session.notif_pipe, &board.height, sizeof(int)) != sizeof(int)) {
+        perror("Error reading board height");
+        exit(EXIT_FAILURE);
+    } 
     
-    if (read(session.notif_pipe, &board.tempo, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
-    if (read(session.notif_pipe, &board.victory, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
-    if (read(session.notif_pipe, &board.game_over, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
-    if (read(session.notif_pipe, &board.accumulated_points, sizeof(int)) != sizeof(int)) exit(EXIT_FAILURE);
+    if (read(session.notif_pipe, &board.tempo, sizeof(int)) != sizeof(int)) {
+        perror("Error reading board tempo");
+        exit(EXIT_FAILURE);
+    } 
+
+    if (read(session.notif_pipe, &board.victory, sizeof(int)) != sizeof(int)) {
+        perror("Error reading board victory");
+        exit(EXIT_FAILURE);
+    }
+
+    if (read(session.notif_pipe, &board.game_over, sizeof(int)) != sizeof(int)) {
+        perror("Error reading board game_over");
+        exit(EXIT_FAILURE);
+    }
+
+    if (read(session.notif_pipe, &board.accumulated_points, sizeof(int)) != sizeof(int)) {
+        perror("Error reading board accumulated points");
+        exit(EXIT_FAILURE);
+    }
     
     int board_size = board.width*board.height;
     board.data = calloc(1, sizeof(board_size));
     if(read(session.notif_pipe, board.data, board_size) != board_size) {
         free(board.data);
+        perror("Error reading board data");
         exit(EXIT_FAILURE);
     } 
-        
     
     return board;
 }
