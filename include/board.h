@@ -69,6 +69,8 @@ typedef struct {
     int tempo;              // duration of each play
     pthread_rwlock_t board_lock; // global lock for the board
     int shutdown_threads;   // thread shutdown flag
+    int victory;    // 1 if the game has been won, 0 otherwise
+    int game_over;  // 1 if pacman has died, 0 otherwise
 } board_t;
 
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/

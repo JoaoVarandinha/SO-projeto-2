@@ -1,7 +1,9 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "board.h"
 #include "protocol.h"
+#include <semaphore.h>
 
 typedef struct {
     int id;
@@ -26,6 +28,6 @@ typedef struct {
     Server_session* all_sessions;
 } Server_manager;
 
-int run_game(Server_session* session, char levels_dir);
+int run_game(Server_session* session, const char* levels_dir);
 
 #endif

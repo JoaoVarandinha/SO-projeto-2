@@ -12,18 +12,9 @@ CLIENT_DIR = src/client
 SERVER_DIR = src/server
 COMMON_DIR = src/common
 
-# executable 
-TARGET = Pacmanist
-
-#client
+# executables
 CLIENT = client
-
-#server
 SERVER = server
-
-#common
-COMMON = common
-
 
 #Client objects
 OBJS_CLIENT = client_main.o debug.o api.o display.o
@@ -39,14 +30,12 @@ display.o = display.h
 board.o = board.h
 parser.o = parser.h
 api.o = api.h protocol.h
-game.o = game.h
+game.o = game.h	protocol.h
 debug.o = debug.h
 
 # Object files path
 vpath %.o $(OBJ_DIR)
-vpath %.c $(CLIENT_DIR) $(INCLUDE_DIR)
-vpath %.c $(SERVER_DIR) $(INCLUDE_DIR)
-vpath %.c $(COMMON_DIR) $(INCLUDE_DIR)
+vpath %.c $(CLIENT_DIR) $(SERVER_DIR) $(COMMON_DIR) $(INCLUDE_DIR)
 
 # Make targets
 all: client server
@@ -64,6 +53,7 @@ $(BIN_DIR)/$(SERVER): $(OBJS_SERVER) $(OBJS_COMMON)| folders
 # dont include LDFLAGS in the end, to allow compilation on macos
 %.o: %.c $($@) | folders
 	$(CC) -I $(INCLUDE_DIR) $(CFLAGS) -o $(OBJ_DIR)/$@ -c $<
+
 # Create folders
 folders:
 	mkdir -p $(OBJ_DIR)
@@ -72,7 +62,6 @@ folders:
 # Clean object files and executable
 clean:
 	rm -f $(OBJ_DIR)/*.o
-	rm -f $(BIN_DIR)/$(TARGET)
 	rm -f $(BIN_DIR)/$(CLIENT)
 	rm -f $(BIN_DIR)/$(SERVER)
 

@@ -456,7 +456,10 @@ void kill_pacman(board_t* board, int pacman_index) {
 
 
 void load_pacman(board_t* board, int points) {
-    board->pacmans = calloc(1, sizeof(pacman_t));
+    if (!(board->pacmans = calloc(1, sizeof(pacman_t)))) {
+        perror("Error allocating memory to pacman");
+        exit(EXIT_FAILURE);
+    }
     pacman_t* pac = &board->pacmans[0];
 
     pac->points = points;
@@ -482,7 +485,10 @@ void load_ghosts(board_t* board) {
     if (board->n_ghosts == 0) {
         exit(EXIT_FAILURE);
     } 
-    board->ghosts = calloc(board->n_ghosts, sizeof(ghost_t));
+    if (!(board->ghosts = calloc(board->n_ghosts, sizeof(ghost_t)))) {
+        perror("Error allocating memory to ghosts");
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < board->n_ghosts; i++) {
         read_file(board, board->ghosts_files[i], GHOST, i);
         ghost_t* ghost = &board->ghosts[i];
@@ -493,6 +499,8 @@ void load_ghosts(board_t* board) {
 void load_level(board_t* board, char* filename) {
     board->n_pacmans = 0;
     board->n_ghosts = 0;
+    board->victory = 0;
+    board->game_over = 0;
     strcpy(board->level_name, filename);
     pthread_rwlock_init(&board->board_lock, NULL);
 

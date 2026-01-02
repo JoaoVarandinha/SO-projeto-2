@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -42,31 +43,27 @@ void* session_thread(void* arg) {
     pthread_mutex_init(&session->session_lock, NULL);
 
     while (1) {
+        sem_wait(&session->session_sem);
         if (0) { //END
             break;
         }
-        sem_wait(&session->session_sem);
         change_ongoing_sessions(1);
+
         pthread_mutex_lock(&session->session_lock);
         session->running = 1;
         pthread_mutex_unlock(&session->session_lock);
 
-        while (1) {
-            char instruction[MAX_INSTRUCTION_LENGTH];
-            read_line(session->req_pipe, instruction);
 
-            if (instruction[0] == OP_CODE_DISCONNECT) break;
+        run_game(session, manager.levels_dir);
 
-            else if(instruction[0] == OP_CODE_PLAY) {
 
-            } else if(instruction[0] == OP_CODE_BOARD) {
-
-            }
-        }
+        close(session->req_pipe);
+        close(session->notif_pipe);
 
         pthread_mutex_lock(&session->session_lock);
         session->running = 0;
         pthread_mutex_unlock(&session->session_lock);
+
         change_ongoing_sessions(-1);
         sem_post(&manager.server_sem);
     }
@@ -86,14 +83,17 @@ int main (int argc, char* argv[]) {
     }
 
     manager.levels_dir = argv[1];
-    manager.max_games = argv[2];
+    manager.max_games = atoi(argv[2]);
     manager.server_pipe_path = argv[3];
     manager.ongoing_sessions = 0;
     sem_init(&manager.server_sem, 0, manager.max_games);
     pthread_mutex_init(&manager.server_lock, NULL);
-    manager.all_sessions = calloc(manager.max_games, sizeof(Server_session));
+    if (!(manager.all_sessions = calloc(manager.max_games, sizeof(Server_session)))) {
+        perror("Error allocating memory to manager");
+        exit(EXIT_FAILURE);
+    }
 
-    if (mkfifo(manager.server_pipe_path, 0422) != 0) {
+    if (mkfifo(manager.server_pipe_path, 0666) != 0) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
     }
@@ -119,39 +119,39 @@ int main (int argc, char* argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        int server_pipe_fd = open(manager.server_pipe_path, O_RDONLY);
-        char* instruction[MAX_PIPE_PATH_LENGTH*2 + 4];
-        read_line(server_pipe_fd, instruction);
-        close(server_pipe_fd);
-
-        if (instruction[0] != 1) {
-            perror("Message error in server pipe");
-            exit(EXIT_FAILURE);
-        }
-
         Server_session* session = find_open_session();
 
-        sscanf(instruction, "1 %s %s\n", session->req_pipe_path, session->notif_pipe_path);
+
+        int server_pipe_fd = open(manager.server_pipe_path, O_RDWR);
+
+        char op_code;
+        read_char(server_pipe_fd, &op_code, sizeof(char));
+
+        read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH);
+        read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH);
+
+        close(server_pipe_fd);
+
 
         session->req_pipe = open(session->req_pipe_path, O_RDONLY);
         session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
 
-        char buf[3];
+        char buf = OP_CODE_CONNECT;
+        write(session->notif_pipe, &buf, 1);
 
-        if (session->req_pipe == 0 && session->notif_pipe == 0) {
-            sprintf(buf, "%s %s\n", OP_CODE_CONNECT, 0);
-            sem_post(&session->session_sem);
+        if (session->req_pipe == -1 || session->notif_pipe == -1) {
+            buf = '1';
+            write(session->notif_pipe, &buf, sizeof(char));
         } else {
-            sprintf(buf, "%s %s\n", OP_CODE_CONNECT, 1);
+            buf = '0';
+            write(session->notif_pipe, &buf, sizeof(char));
+            sem_post(&session->session_sem);
         }
-
-        write(session->notif_pipe, buf, 3);
-
     }
 
 
     for (int i = 0; i < manager.max_games; i++) {
-        pthread_join(&session_tid[i], NULL);
+        pthread_join(session_tid[i], NULL);
     }
     sem_destroy(&manager.server_sem);
     pthread_mutex_destroy(&manager.server_lock);

@@ -31,12 +31,29 @@ int pacman_alive(board_t* board) {
     return status;
 }
 
+void send_board(Server_session* session) {
+    board_t* board = &session->board;
+    char op_code = OP_CODE_BOARD;
+    if (write(session->notif_pipe, &op_code, sizeof(char)) != sizeof(char) ||
+        write(session->notif_pipe, &board->width, sizeof(int)) != sizeof(int) ||
+        write(session->notif_pipe, &board->height, sizeof(int)) != sizeof(int) ||
+        write(session->notif_pipe, &board->tempo, sizeof(int)) != sizeof(int) ||
+        write(session->notif_pipe, &board->victory, sizeof(int)) != sizeof(int) ||
+        write(session->notif_pipe, &board->game_over, sizeof(int)) != sizeof(int) ||
+        write(session->notif_pipe, &board->pacmans[0].points, sizeof(int)) != sizeof(int)) {
+
+        perror("Error writing to request pipe - play");
+        exit(EXIT_FAILURE);
+    }
+}
+
 void *display_thread(void* arg) {
-    board_t* board = (board_t*)arg;
+    Server_session* session = (Server_session*) arg;
+    board_t* board = &session->board;
     
     sleep_ms(board->tempo / 2);
 
-    while (true) {
+    while (1) {
         sleep_ms(board->tempo);
 
         pthread_rwlock_wrlock(&board->board_lock);
@@ -44,7 +61,9 @@ void *display_thread(void* arg) {
             pthread_rwlock_unlock(&board->board_lock);
             pthread_exit(NULL);
         }
-        //SEND BOARD UPDATE HERE
+
+        send_board(session);
+
         pthread_rwlock_unlock(&board->board_lock);
     }
 }
@@ -52,11 +71,10 @@ void *display_thread(void* arg) {
 void *pacman_thread(void* arg) {
     Server_session* session = (Server_session*)arg;
     board_t* board = &session->board;
-    pacman_t* pacman = &board->pacmans[0];
 
     int *play_result = malloc(sizeof(int));
 
-    while (true) {
+    while (1) {
         if (!pacman_alive(board)) {
             *play_result = QUIT_GAME;
             return (void*) play_result;
@@ -65,10 +83,16 @@ void *pacman_thread(void* arg) {
         command_t* play;
         command_t c;
 
-        char buf[3];
-        // NORMAL READ HERE
+        c.command = read_request_pipe(session);
+
+        play = &c;
 
         debug("KEY %c\n", play->command);
+        
+        if (play->command == 'Q') {
+            *play_result = QUIT_GAME;
+            return (void*) play_result;
+        }
 
         pthread_rwlock_rdlock(&board->board_lock);
 
@@ -100,7 +124,7 @@ void *ghost_thread(void* arg) {
 
     ghost_t* ghost = &board->ghosts[ghost_idx];
 
-    while (true) {
+    while (1) {
         sleep_ms(board->tempo);
 
         pthread_rwlock_rdlock(&board->board_lock);
@@ -127,10 +151,14 @@ int play_board_threads(Server_session* session) {
 
     board->shutdown_threads = 0;
 
-    pthread_create(&display_tid, NULL, display_thread, board);
+    pthread_create(&display_tid, NULL, display_thread, session);
     pthread_create(&pac_tid, NULL, pacman_thread, session);
     for (int i = 0; i < board->n_ghosts; i++) {
-        ghost_thread_args* args = calloc(1, sizeof(*args));
+        ghost_thread_args* args;
+        if (!(args = calloc(1, sizeof(*args)))) {
+            perror("Error allocating memory to ghost thread args");
+            exit(EXIT_FAILURE);
+        }
 
         args->board = board;
         args->ghost_idx = i;
@@ -157,17 +185,15 @@ int play_board_threads(Server_session* session) {
 }
 
 
-int run_game(Server_session* session, char levels_dir) {
+int run_game(Server_session* session, const char* levels_dir) {
 
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
 
     open_debug_file("debug.log");
-
-    terminal_init();
     
     int accumulated_points = 0;
-    bool end_game = false;
+    int end_game = 0;
     board_t* game_board = &session->board;
     
     strcpy(game_board->dir_name, levels_dir);
@@ -187,32 +213,35 @@ int run_game(Server_session* session, char levels_dir) {
         load_pacman(game_board,accumulated_points);
         load_ghosts(game_board);
 
-        while (true) {
+        while (1) {
 
-            int result = play_board_threads(&game_board);
+            int result = play_board_threads(session);
 
             if (result == NEXT_LEVEL) {
+                game_board->victory = 1;
+                send_board(session);
                 sleep_ms(game_board->tempo);
                 break;
             }
 
             if (result == QUIT_GAME) {
                 sleep_ms(game_board->tempo);
-                end_game = true;
+                game_board->game_over = 1;
+                send_board(session);
+                end_game = 1;
                 break;
             }
         }
 
     accumulated_points = game_board->pacmans[0].points;
 
-    print_board(&game_board);
-    unload_level(&game_board);
+    print_board(game_board);
+    unload_level(game_board);
 
     }
 
     closedir(dir);
 
-    terminal_cleanup();
 
     close_debug_file();
 
