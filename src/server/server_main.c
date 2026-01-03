@@ -47,6 +47,24 @@ void* session_thread(void* arg) {
         if (0) { //END
             break;
         }
+
+        sscanf(session->req_pipe_path, "/tmp/%d_request", &session->id);
+
+        session->req_pipe = open(session->req_pipe_path, O_RDONLY);
+        session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
+
+        char buf = OP_CODE_CONNECT;
+        write(session->notif_pipe, &buf, sizeof(char));
+
+        if (session->req_pipe == -1 || session->notif_pipe == -1) {
+            buf = '1';
+            write(session->notif_pipe, &buf, sizeof(char));
+            continue;
+        } else {
+            buf = '0';
+            write(session->notif_pipe, &buf, sizeof(char));
+        }
+
         change_ongoing_sessions(1);
 
         pthread_mutex_lock(&session->session_lock);
@@ -136,22 +154,7 @@ int main (int argc, char* argv[]) {
 
         close(server_pipe_fd);
 
-        sscanf(session->req_pipe_path, "/tmp/%d_request", &session->id);
-
-        session->req_pipe = open(session->req_pipe_path, O_RDONLY);
-        session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
-
-        char buf = OP_CODE_CONNECT;
-        write(session->notif_pipe, &buf, sizeof(char));
-
-        if (session->req_pipe == -1 || session->notif_pipe == -1) {
-            buf = '1';
-            write(session->notif_pipe, &buf, sizeof(char));
-        } else {
-            buf = '0';
-            write(session->notif_pipe, &buf, sizeof(char));
-            sem_post(&session->session_sem);
-        }
+        sem_post(&session->session_sem);
     }
 
 
