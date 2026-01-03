@@ -42,11 +42,13 @@ ssize_t read_line(int fd, char* buf) {
 
 ssize_t read_char(int fd, char* buf, int bytes) {
     char c;
+    int ignore = 0;
     ssize_t n, total_read = 0;
 
     while (total_read < bytes) {
         n = read(fd, &c, 1);
-        if (c == '\0') break;
+        if (c == '\0') ignore = 1;
+        if (ignore) c = '\0';
         buf[total_read++] = c;
         
         if (n == 0) break;
@@ -57,13 +59,6 @@ ssize_t read_char(int fd, char* buf, int bytes) {
     }
 
     buf[total_read] = '\0';
-
-    if (bytes == MAX_PIPE_PATH_LENGTH) {
-        for (int j = total_read + 1; j < MAX_PIPE_PATH_LENGTH; j++) {
-            buf[j] = '\0';
-        }
-        total_read = MAX_PIPE_PATH_LENGTH;
-    }
 
     return total_read;
 }

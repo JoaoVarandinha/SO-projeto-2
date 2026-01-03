@@ -142,7 +142,7 @@ int main (int argc, char* argv[]) {
         session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
 
         char buf = OP_CODE_CONNECT;
-        write(session->notif_pipe, &buf, 1);
+        write(session->notif_pipe, &buf, sizeof(char));
 
         if (session->req_pipe == -1 || session->notif_pipe == -1) {
             buf = '1';

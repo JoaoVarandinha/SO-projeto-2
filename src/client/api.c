@@ -87,7 +87,11 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 
     read_char(session.notif_pipe, buf, sizeof(char));
 
-    return buf[0];
+    if (buf[0] == 1) {
+        return 1;
+    }
+
+    return 0;
 }
 
 void pacman_play(char command) {
