@@ -54,15 +54,15 @@ void* session_thread(void* arg) {
         session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
 
         char buf = OP_CODE_CONNECT;
-        write(session->notif_pipe, &buf, sizeof(char));
+        write(session->notif_pipe, &buf, 1);
 
         if (session->req_pipe == -1 || session->notif_pipe == -1) {
             buf = '1';
-            write(session->notif_pipe, &buf, sizeof(char));
+            write(session->notif_pipe, &buf, 1);
             continue;
         } else {
             buf = '0';
-            write(session->notif_pipe, &buf, sizeof(char));
+            write(session->notif_pipe, &buf, 1);
         }
 
         change_ongoing_sessions(1);
@@ -143,7 +143,7 @@ int main (int argc, char* argv[]) {
         int server_pipe_fd = open(manager.server_pipe_path, O_RDWR);
 
         char op_code;
-        read_char(server_pipe_fd, &op_code, sizeof(char));
+        read_char(server_pipe_fd, &op_code, 1);
 
         if (op_code != OP_CODE_CONNECT) {
             perror("Error wrong op code in server pipe");

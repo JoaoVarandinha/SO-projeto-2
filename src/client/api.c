@@ -48,7 +48,7 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 
     char op_code = OP_CODE_CONNECT;
 
-    if (write(server_pipe, &op_code, sizeof(char)) != sizeof(char) ||
+    if (write(server_pipe, &op_code, 1) != 1 ||
         write(server_pipe, req_pipe_path, MAX_PIPE_PATH_LENGTH) != MAX_PIPE_PATH_LENGTH ||
         write(server_pipe, notif_pipe_path, MAX_PIPE_PATH_LENGTH) != MAX_PIPE_PATH_LENGTH) {
 
@@ -77,15 +77,15 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     strcpy(session.req_pipe_path, req_pipe_path);
     strcpy(session.notif_pipe_path, notif_pipe_path);
 
-    char buf[sizeof(char)];
-    read_char(session.notif_pipe, buf, sizeof(char));
+    char buf[1];
+    read_char(session.notif_pipe, buf, 1);
 
     if (buf[0] != OP_CODE_CONNECT) {
         perror("Error retrieving result for connect");
         exit(EXIT_FAILURE);
     }
 
-    read_char(session.notif_pipe, buf, sizeof(char));
+    read_char(session.notif_pipe, buf, 1);
 
     if (buf[0] == 1) {
         return 1;
@@ -96,8 +96,8 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 
 void pacman_play(char command) {
     char op_code = OP_CODE_PLAY;
-    if (write(session.req_pipe, &op_code, sizeof(char)) != sizeof(char) ||
-        write(session.req_pipe, &command, sizeof(char)) != sizeof(char)) {
+    if (write(session.req_pipe, &op_code, 1) != 1 ||
+        write(session.req_pipe, &command, 1) != 1) {
 
         perror("Error writing to request pipe - play");
         exit(EXIT_FAILURE);
@@ -106,7 +106,7 @@ void pacman_play(char command) {
 
 int pacman_disconnect() {
     char op_code = OP_CODE_DISCONNECT;
-    if (write(session.req_pipe, &op_code, sizeof(char)) != sizeof(char)) {
+    if (write(session.req_pipe, &op_code, 1) != 1) {
         perror("Error writing to request pipe - disconnect");
         exit(EXIT_FAILURE);
     }
@@ -123,7 +123,7 @@ Board receive_board_update(void) {
     Board board;
 
     char op_code;
-    read_char(session.notif_pipe, &op_code, sizeof(char));
+    read_char(session.notif_pipe, &op_code, 1);
 
     if (op_code != OP_CODE_BOARD) exit(EXIT_FAILURE);
 
@@ -135,7 +135,7 @@ Board receive_board_update(void) {
     read_int(session.notif_pipe, &board.accumulated_points);
 
     int board_size = board.width*board.height;
-    if (!(board.data = calloc(board_size, sizeof(char)))) { 
+    if (!(board.data = calloc(board_size, 1))) { 
         perror("Failed to allocate board data");
         exit(EXIT_FAILURE);
     }

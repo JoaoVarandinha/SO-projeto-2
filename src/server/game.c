@@ -34,7 +34,7 @@ int pacman_alive(board_t* board) {
 void send_board(Server_session* session) {
     board_t* board = &session->board;
     char op_code = OP_CODE_BOARD;
-    if (write(session->notif_pipe, &op_code, sizeof(char)) != sizeof(char) ||
+    if (write(session->notif_pipe, &op_code, 1) != 1 ||
         write(session->notif_pipe, &board->width, sizeof(int)) != sizeof(int) ||
         write(session->notif_pipe, &board->height, sizeof(int)) != sizeof(int) ||
         write(session->notif_pipe, &board->tempo, sizeof(int)) != sizeof(int) ||
