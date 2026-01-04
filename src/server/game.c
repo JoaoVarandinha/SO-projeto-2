@@ -205,6 +205,7 @@ int run_game(Server_session* session, const char* levels_dir) {
     open_debug_file("debug.log");
     
     int accumulated_points = 0;
+    int result;
     board_t* game_board = &session->board;
     
     strcpy(game_board->dir_name, levels_dir);
@@ -226,7 +227,7 @@ int run_game(Server_session* session, const char* levels_dir) {
 
         send_board(session);
 
-        int result = play_board_threads(session);
+        result = play_board_threads(session);
 
         if (result == NEXT_LEVEL) {
             game_board->victory = 1;
@@ -252,5 +253,6 @@ int run_game(Server_session* session, const char* levels_dir) {
 
     close_debug_file();
 
-    return 0;
+    if (result == QUIT_GAME) return 0;
+    return 1;
 }

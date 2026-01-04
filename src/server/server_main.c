@@ -20,6 +20,7 @@ Server_session* find_open_session() {
         Server_session* session = &manager.all_sessions[i];
         pthread_mutex_lock(&session->session_lock);
         if (session->running == 0) {
+            session->running = 1;
             pthread_mutex_unlock(&session->session_lock);
             return session;
         }
@@ -42,6 +43,14 @@ void change_ongoing_sessions(int i) {
     pthread_mutex_unlock(&manager.server_lock);
 }
 
+void end_session(Server_session* session) {
+    pthread_mutex_lock(&session->session_lock);
+    session->running = 0;
+    pthread_mutex_unlock(&session->session_lock);
+    change_ongoing_sessions(-1);
+    sem_post(&manager.server_sem);
+}
+
 void* session_thread(void* arg) {
     Server_session* session = (Server_session*) arg;
     sem_init(&session->session_sem, 0, 0);
@@ -61,6 +70,7 @@ void* session_thread(void* arg) {
 
         char buf = '0';
         if (session->req_pipe == -1 || session->notif_pipe == -1) {
+            end_session(session);
             buf = '1';
             continue;
         }
@@ -72,26 +82,16 @@ void* session_thread(void* arg) {
             exit(EXIT_FAILURE);
         }
 
-        sem_post(&manager.server_sem);
-        change_ongoing_sessions(1);
+        int wait = run_game(session, manager.levels_dir);
 
-        pthread_mutex_lock(&session->session_lock);
-        session->running = 1;
-        pthread_mutex_unlock(&session->session_lock);
-
-
-        run_game(session, manager.levels_dir);
-
+        if (wait) {
+            while (read_request_pipe(session) != 'Q') {}
+        }
 
         close(session->req_pipe);
         close(session->notif_pipe);
 
-        pthread_mutex_lock(&session->session_lock);
-        session->running = 0;
-        pthread_mutex_unlock(&session->session_lock);
-
-        change_ongoing_sessions(-1);
-        sem_post(&manager.server_sem);
+        end_session(session);
     }
 
     sem_destroy(&session->session_sem);
@@ -138,6 +138,8 @@ int main (int argc, char* argv[]) {
         if (0) { //END
             break;
         }
+        sem_wait(&manager.server_sem);
+        change_ongoing_sessions(1);
 
         Server_session* session = find_open_session();
 
@@ -148,6 +150,7 @@ int main (int argc, char* argv[]) {
             perror("Error wrong op code in server pipe");
             exit(EXIT_FAILURE);
         }
+
         read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH);
         read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH);
 
