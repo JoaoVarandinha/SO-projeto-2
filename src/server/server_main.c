@@ -54,15 +54,24 @@ void* session_thread(void* arg) {
         session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
 
         char buf = OP_CODE_CONNECT;
-        write(session->notif_pipe, &buf, 1);
+        if (write(session->notif_pipe, &buf, 1) != 1) {
+            perror("Error writing to notif pipe - connect");
+            exit(EXIT_FAILURE);
+        }
 
         if (session->req_pipe == -1 || session->notif_pipe == -1) {
             buf = '1';
-            write(session->notif_pipe, &buf, 1);
+            if (write(session->notif_pipe, &buf, 1) != 1) {
+                perror("Error writing to notif pipe - connect");
+                exit(EXIT_FAILURE);
+            }
             continue;
         } else {
             buf = '0';
-            write(session->notif_pipe, &buf, 1);
+            if (write(session->notif_pipe, &buf, 1) != 1) {
+                perror("Error writing to notif pipe - connect");
+                exit(EXIT_FAILURE);
+            }
         }
 
         change_ongoing_sessions(1);
