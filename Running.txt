@@ -9,7 +9,7 @@ gdb --args bin/server info_files 1 pipe_servidor
 
 Client:
 
-./bin/client 10 pipe_servidor info_client_files/1.p
+./bin/client 1 pipe_servidor info_client_files/1.p
 
            Executable/id/server_pipe_path/pacman_file
 gdb --args bin/client 10 pipe_servidor info_client_files/1.p

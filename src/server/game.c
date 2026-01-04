@@ -60,8 +60,6 @@ void send_board(Server_session* session) {
 void *display_thread(void* arg) {
     Server_session* session = (Server_session*) arg;
     board_t* board = &session->board;
-    
-    sleep_ms(board->tempo / 2);
 
     while (1) {
         sleep_ms(board->tempo);
@@ -225,7 +223,7 @@ int run_game(Server_session* session, const char* levels_dir) {
         load_pacman(game_board,accumulated_points);
         load_ghosts(game_board);
 
-        send_board(session);
+        //send_board(session);
 
         result = play_board_threads(session);
 

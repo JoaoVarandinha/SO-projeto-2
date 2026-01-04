@@ -13,7 +13,61 @@
 #include <semaphore.h>
 #include <signal.h>
 
+#define HIGHSCORE_FILE "info_client_files/points"
+
 static Server_manager manager;
+
+volatile sig_atomic_t sigusr1_flag = 0;
+
+void sigusr1_handler(int signum) {
+    (void)signum;
+    sigusr1_flag = 1;
+}
+
+void print_current_highscores(int current_sessions) {
+    sigusr1_flag = 0;
+    int picked[manager.max_games];
+    for (int i = 0; i < manager.max_games; i++) picked[i] = 0;
+
+    int amount_sessions = current_sessions < 5 ? current_sessions : 5;
+
+    char buf[MAX_INSTRUCTION_LENGTH] = "";
+
+    for (int i = 0; i < amount_sessions; i++) {
+        int max_pos = -1, max_points = -1, max_id;
+
+        for (int j = 0; j < manager.max_games; j++) {
+            Server_session* ses = &manager.all_sessions[j];
+            pthread_rwlock_wrlock(&ses->board.board_lock);
+            if (!ses->running || picked[j]) continue;
+
+            int pts = ses->board.pacmans[0].points;
+            if (max_points >= pts) continue;
+
+            max_points = pts;
+            max_id = ses->id;
+            max_pos = j;
+        }
+        if (max_pos == -1) break;
+
+        picked[max_pos] = 1;
+
+        char temp[40];
+        sprintf(temp, "Id:%d - Points:%d\n", max_id, max_points);
+        strcat(buf, temp);
+    }
+
+    for (int i = 0; i < manager.max_games; i++) {
+        pthread_rwlock_unlock(&manager.all_sessions[i].board.board_lock);
+    }
+
+    int high_fd = open(HIGHSCORE_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (high_fd == -1 || write(high_fd, buf, strlen(buf)) != (ssize_t)strlen(buf)) {
+        perror("Error writing to points file");
+        exit(EXIT_FAILURE);
+    }
+    close(high_fd);
+}
 
 Server_session* find_open_session() {
     for (int i = 0; i < manager.max_games; i++) {
@@ -52,6 +106,11 @@ void end_session(Server_session* session) {
 }
 
 void* session_thread(void* arg) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
+
     Server_session* session = (Server_session*) arg;
     sem_init(&session->session_sem, 0, 0);
     pthread_mutex_init(&session->session_lock, NULL);
@@ -108,6 +167,11 @@ int main (int argc, char* argv[]) {
         return 1;
     }
     signal(SIGPIPE, SIG_IGN);
+    struct sigaction sa;
+    sa.sa_handler = sigusr1_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGUSR1, &sa, NULL);
 
     manager.levels_dir = argv[1];
     manager.max_games = atoi(argv[2]);
@@ -119,6 +183,8 @@ int main (int argc, char* argv[]) {
         perror("Error allocating memory to manager");
         exit(EXIT_FAILURE);
     }
+
+    unlink(HIGHSCORE_FILE);
     unlink(manager.server_pipe_path);
     if (mkfifo(manager.server_pipe_path, 0666) != 0) {
         perror("Error creating named pipe");
@@ -138,7 +204,13 @@ int main (int argc, char* argv[]) {
         if (0) { //END
             break;
         }
-        sem_wait(&manager.server_sem);
+
+        if (sigusr1_flag) print_current_highscores(check_ongoing_sessions()); //SIGUSR1 FLAG
+
+        while (sem_trywait(&manager.server_sem) != 0) {
+            sleep_ms(500);
+            if (sigusr1_flag) print_current_highscores(check_ongoing_sessions()); //SIGUSR1 FLAG
+        }
         change_ongoing_sessions(1);
 
         Server_session* session = find_open_session();
