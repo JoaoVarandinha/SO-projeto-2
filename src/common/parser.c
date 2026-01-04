@@ -83,14 +83,14 @@ ssize_t read_int(int fd, int* buf) {
 
 char read_request_pipe(Server_session* session) {
     char buf;
-    read_char(session->notif_pipe, &buf, sizeof(char));
+    read_char(session->req_pipe, &buf, sizeof(char));
 
     switch (buf) {
         case OP_CODE_DISCONNECT: { //disconnect
             return 'Q';
         }
         case OP_CODE_PLAY: { //move_pacman
-            read_char(session->notif_pipe, &buf, sizeof(char));
+            read_char(session->req_pipe, &buf, sizeof(char));
 
             return buf;
         }

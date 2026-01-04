@@ -107,7 +107,7 @@ void pacman_play(char command) {
 int pacman_disconnect() {
     char op_code = OP_CODE_DISCONNECT;
     if (write(session.req_pipe, &op_code, sizeof(char)) != sizeof(char)) {
-        perror("Error writing to request pipe");
+        perror("Error writing to request pipe - disconnect");
         exit(EXIT_FAILURE);
     }
 
