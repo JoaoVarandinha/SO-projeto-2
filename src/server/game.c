@@ -205,7 +205,6 @@ int run_game(Server_session* session, const char* levels_dir) {
     open_debug_file("debug.log");
     
     int accumulated_points = 0;
-    int end_game = 0;
     board_t* game_board = &session->board;
     
     strcpy(game_board->dir_name, levels_dir);
@@ -217,7 +216,7 @@ int run_game(Server_session* session, const char* levels_dir) {
     }
 
     struct dirent* entry;
-    while (!end_game && (entry = readdir(dir)) != NULL) {
+    while ((entry = readdir(dir)) != NULL) {
         int len = strlen(entry->d_name);
         if (len <= 4 || strcmp(entry->d_name + len - 4, LEVEL) != 0) continue;
 
@@ -227,33 +226,27 @@ int run_game(Server_session* session, const char* levels_dir) {
 
         send_board(session);
 
-        while (1) {
+        int result = play_board_threads(session);
 
-            int result = play_board_threads(session);
+        if (result == NEXT_LEVEL) {
+            game_board->victory = 1;
+            send_board(session);
+            sleep_ms(game_board->tempo);
+            continue;
+        }
 
-            if (result == NEXT_LEVEL) {
-                game_board->victory = 1;
-                send_board(session);
-                sleep_ms(game_board->tempo);
-                break;
-            }
-
-            if (result == QUIT_GAME) {
-                game_board->game_over = 1;
-                send_board(session);
-                end_game = 1;
-                sleep_ms(game_board->tempo);
-                break;
-            }
+        if (result == QUIT_GAME) {
+            break;
         }
 
         accumulated_points = game_board->pacmans[0].points;
 
         print_board(game_board);
         unload_level(game_board);
-
     }
+
     game_board->game_over = 1;
+    send_board(session);
 
     closedir(dir);
 
