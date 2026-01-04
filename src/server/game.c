@@ -53,6 +53,7 @@ void send_board(Server_session* session) {
         perror("Error writing board data to request pipe - board");
         exit(EXIT_FAILURE);
     }
+    debug("Board update:\n%s\n", board_data);
     free(board_data);
 }
 
@@ -222,6 +223,8 @@ int run_game(Server_session* session, const char* levels_dir) {
         load_pacman(game_board,accumulated_points);
         load_ghosts(game_board);
 
+        send_board(session);
+
         while (1) {
 
             int result = play_board_threads(session);
@@ -234,23 +237,23 @@ int run_game(Server_session* session, const char* levels_dir) {
             }
 
             if (result == QUIT_GAME) {
-                sleep_ms(game_board->tempo);
                 game_board->game_over = 1;
                 send_board(session);
                 end_game = 1;
+                sleep_ms(game_board->tempo);
                 break;
             }
         }
 
-    accumulated_points = game_board->pacmans[0].points;
+        accumulated_points = game_board->pacmans[0].points;
 
-    print_board(game_board);
-    unload_level(game_board);
+        print_board(game_board);
+        unload_level(game_board);
 
     }
+    game_board->game_over = 1;
 
     closedir(dir);
-
 
     close_debug_file();
 

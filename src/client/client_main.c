@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 Board board;
 bool stop_execution = false;
@@ -23,6 +24,8 @@ static void *receiver_thread(void *arg) {
     while (true) {
         
         Board board = receive_board_update();
+
+        debug("Board update:\n%s\n", board.data);
 
         if (!board.data || board.game_over == 1){
             pthread_mutex_lock(&mutex);
@@ -50,6 +53,7 @@ int main(int argc, char *argv[]) {
             argv[0]);
         return 1;
     }
+    signal(SIGPIPE, SIG_IGN);
 
     const char *client_id = argv[1];
     const char *register_pipe = argv[2];
