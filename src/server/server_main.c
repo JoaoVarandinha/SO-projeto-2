@@ -72,6 +72,7 @@ void* session_thread(void* arg) {
             exit(EXIT_FAILURE);
         }
 
+        sem_post(&manager.server_sem);
         change_ongoing_sessions(1);
 
         pthread_mutex_lock(&session->session_lock);
@@ -133,17 +134,9 @@ int main (int argc, char* argv[]) {
 
 
     while (1) {
-        
-        sem_wait(&manager.server_sem);
 
         if (0) { //END
             break;
-        }
-
-        if (check_ongoing_sessions() == manager.max_games) {
-            unlink(manager.server_pipe_path);
-            perror("Error creating session with no available slots");
-            exit(EXIT_FAILURE);
         }
 
         Server_session* session = find_open_session();
