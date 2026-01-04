@@ -90,6 +90,8 @@ void *pacman_thread(void* arg) {
             return (void*) play_result;
         }
 
+        sleep_ms(board->tempo);
+
         command_t* play;
         command_t c;
 

@@ -17,9 +17,13 @@ static Server_manager manager;
 
 Server_session* find_open_session() {
     for (int i = 0; i < manager.max_games; i++) {
-        if (manager.all_sessions[i].running == 0) {
-            return &manager.all_sessions[i];
+        Server_session* session = &manager.all_sessions[i];
+        pthread_mutex_lock(&session->session_lock);
+        if (session->running == 0) {
+            pthread_mutex_unlock(&session->session_lock);
+            return session;
         }
+        pthread_mutex_unlock(&session->session_lock);
     }
     perror("Error finding an open session");
     exit(EXIT_FAILURE);
@@ -45,6 +49,7 @@ void* session_thread(void* arg) {
 
     while (1) {
         sem_wait(&session->session_sem);
+
         if (0) { //END
             break;
         }
@@ -54,25 +59,17 @@ void* session_thread(void* arg) {
         session->req_pipe = open(session->req_pipe_path, O_RDONLY);
         session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
 
-        char buf = OP_CODE_CONNECT;
-        if (write(session->notif_pipe, &buf, 1) != 1) {
-            perror("Error writing to notif pipe - connect");
-            exit(EXIT_FAILURE);
-        }
-
+        char buf = '0';
         if (session->req_pipe == -1 || session->notif_pipe == -1) {
             buf = '1';
-            if (write(session->notif_pipe, &buf, 1) != 1) {
-                perror("Error writing to notif pipe - connect");
-                exit(EXIT_FAILURE);
-            }
             continue;
-        } else {
-            buf = '0';
-            if (write(session->notif_pipe, &buf, 1) != 1) {
-                perror("Error writing to notif pipe - connect");
-                exit(EXIT_FAILURE);
-            }
+        }
+
+        char op_code = OP_CODE_CONNECT;
+        if (write(session->notif_pipe, &op_code, 1) != 1 ||
+            write(session->notif_pipe, &buf, 1) != 1) {
+            perror("Error writing to notif pipe - connect");
+            exit(EXIT_FAILURE);
         }
 
         change_ongoing_sessions(1);
