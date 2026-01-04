@@ -42,9 +42,18 @@ void send_board(Server_session* session) {
         write(session->notif_pipe, &board->game_over, sizeof(int)) != sizeof(int) ||
         write(session->notif_pipe, &board->pacmans[0].points, sizeof(int)) != sizeof(int)) {
 
-        perror("Error writing to request pipe - play");
+        perror("Error writing board info to request pipe - board");
         exit(EXIT_FAILURE);
     }
+
+    int board_size = board->width*board->height;
+    char* board_data = get_board_displayed(board);
+
+    if (write(session->notif_pipe, board_data, board_size) != board_size) {
+        perror("Error writing board data to request pipe - board");
+        exit(EXIT_FAILURE);
+    }
+    free(board_data);
 }
 
 void *display_thread(void* arg) {

@@ -20,7 +20,7 @@ SERVER = server
 OBJS_CLIENT = client_main.o debug.o api.o display.o
 
 #Server objects
-OBJS_SERVER = server_main.o board.o game.o
+OBJS_SERVER = server_main.o board.o game.o display.o
 
 #Common objects
 OBJS_COMMON = parser.o

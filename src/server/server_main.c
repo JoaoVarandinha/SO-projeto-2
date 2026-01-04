@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <signal.h>
 
 static Server_manager manager;
 
@@ -108,6 +109,7 @@ int main (int argc, char* argv[]) {
             argv[0]);
         return 1;
     }
+    signal(SIGPIPE, SIG_IGN);
 
     manager.levels_dir = argv[1];
     manager.max_games = atoi(argv[2]);
@@ -124,6 +126,7 @@ int main (int argc, char* argv[]) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
     }
+    int server_pipe_fd = open(manager.server_pipe_path, O_RDWR);
 
     pthread_t session_tid[manager.max_games];
 
@@ -148,9 +151,6 @@ int main (int argc, char* argv[]) {
 
         Server_session* session = find_open_session();
 
-
-        int server_pipe_fd = open(manager.server_pipe_path, O_RDWR);
-
         char op_code;
         read_char(server_pipe_fd, &op_code, 1);
 
@@ -160,8 +160,6 @@ int main (int argc, char* argv[]) {
         }
         read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH);
         read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH);
-
-        close(server_pipe_fd);
 
         sem_post(&session->session_sem);
     }
@@ -173,6 +171,7 @@ int main (int argc, char* argv[]) {
     sem_destroy(&manager.server_sem);
     pthread_mutex_destroy(&manager.server_lock);
     free(manager.all_sessions);
+    close(server_pipe_fd);
     unlink(manager.server_pipe_path);
 
     return 0;
