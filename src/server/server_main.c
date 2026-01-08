@@ -109,7 +109,10 @@ void* session_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    pthread_sigmask(SIG_BLOCK, &set, NULL);
+    if (pthread_sigmask(SIG_BLOCK, &set, NULL) != 0) {
+        perror("Error blocking SIGUSR1 in threads");
+        exit(EXIT_FAILURE);
+    }
 
     Server_session* session = (Server_session*) arg;
     sem_init(&session->session_sem, 0, 0);
