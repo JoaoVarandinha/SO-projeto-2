@@ -13,7 +13,7 @@
 #include <semaphore.h>
 #include <signal.h>
 
-#define HIGHSCORE_FILE "info_client_files/points"
+#define HIGHSCORE_FILE "info_client_files/points.txt"
 
 static Server_manager manager;
 
@@ -170,7 +170,7 @@ int main (int argc, char* argv[]) {
     struct sigaction sa;
     sa.sa_handler = sigusr1_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
+    sa.sa_flags = SA_RESTART;
     sigaction(SIGUSR1, &sa, NULL);
 
     manager.levels_dir = argv[1];
@@ -184,7 +184,6 @@ int main (int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    unlink(HIGHSCORE_FILE);
     unlink(manager.server_pipe_path);
     if (mkfifo(manager.server_pipe_path, 0666) != 0) {
         perror("Error creating named pipe");

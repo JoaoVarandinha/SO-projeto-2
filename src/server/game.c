@@ -31,7 +31,7 @@ int pacman_alive(board_t* board) {
     return status;
 }
 
-void send_board(Server_session* session) {
+int send_board(Server_session* session) {
     board_t* board = &session->board;
     char op_code = OP_CODE_BOARD;
     if (write(session->notif_pipe, &op_code, 1) != 1 ||
@@ -42,8 +42,7 @@ void send_board(Server_session* session) {
         write(session->notif_pipe, &board->game_over, sizeof(int)) != sizeof(int) ||
         write(session->notif_pipe, &board->pacmans[0].points, sizeof(int)) != sizeof(int)) {
 
-        perror("Error writing board info to request pipe - board");
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     int board_size = board->width*board->height;
@@ -55,6 +54,7 @@ void send_board(Server_session* session) {
     }
     debug("Board update:\n%s\n", board_data);
     free(board_data);
+    return 0;
 }
 
 void *display_thread(void* arg) {
@@ -70,7 +70,11 @@ void *display_thread(void* arg) {
             pthread_exit(NULL);
         }
 
-        send_board(session);
+        if (send_board(session) == -1) {
+            board->shutdown_threads = 1;
+            pthread_rwlock_unlock(&board->board_lock);
+            pthread_exit(NULL);
+        }
 
         pthread_rwlock_unlock(&board->board_lock);
     }
@@ -229,7 +233,9 @@ int run_game(Server_session* session, const char* levels_dir) {
 
         if (result == NEXT_LEVEL) {
             game_board->victory = 1;
-            send_board(session);
+            if (send_board(session) == -1) {
+                break;
+            }
             sleep_ms(game_board->tempo);
             continue;
         }

@@ -47,15 +47,14 @@ ssize_t read_char(int fd, char* buf, int bytes) {
 
     while (total_read < bytes) {
         n = read(fd, &c, 1);
-        if (c == '\0') ignore = 1;
-        if (ignore) c = '\0';
-        buf[total_read++] = c;
-        
+
         if (n == 0) break;
-        if (n == -1) {
-            perror("Error reading char from file");
-            exit(EXIT_FAILURE);
-        }
+        if (n == -1) return -1;
+
+        if (c == '\0' && bytes == MAX_PIPE_PATH_LENGTH) ignore = 1;
+        if (ignore) c = '\0';
+
+        buf[total_read++] = c;
     }
 
     buf[total_read] = '\0';
@@ -83,14 +82,14 @@ ssize_t read_int(int fd, int* buf) {
 
 char read_request_pipe(Server_session* session) {
     char buf;
-    read_char(session->req_pipe, &buf, 1);
+    if (read_char(session->req_pipe, &buf, 1) == 0) return 'Q';
 
     switch (buf) {
         case OP_CODE_DISCONNECT: { //disconnect
             return 'Q';
         }
         case OP_CODE_PLAY: { //move_pacman
-            read_char(session->req_pipe, &buf, 1);
+            if (read_char(session->req_pipe, &buf, 1) == 0) return 'Q';
 
             return buf;
         }
