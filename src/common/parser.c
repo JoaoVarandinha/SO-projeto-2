@@ -70,7 +70,7 @@ ssize_t read_int(int fd, int* buf) {
         n = read(fd, c + total_read, sizeof(int) - total_read);
         if (n == 0) break;
         if (n == -1) {
-            perror("Error reading in from file");
+            perror("Error reading int from file");
             exit(EXIT_FAILURE);
         }
         total_read += n;

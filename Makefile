@@ -1,7 +1,7 @@
 # Compiler variables
 CC = gcc
 CFLAGS = -g -Wall -Wextra -std=c17 -D_POSIX_C_SOURCE=200809L
-#CFLAGS += -fsanitize=thread
+CFLAGS += -fsanitize=thread
 LDFLAGS = -lncurses
 
 # Directory variables
@@ -17,13 +17,13 @@ CLIENT = client
 SERVER = server
 
 #Client objects
-OBJS_CLIENT = client_main.o debug.o api.o display.o
+OBJS_CLIENT = client_main.o api.o display.o
 
 #Server objects
 OBJS_SERVER = server_main.o board.o game.o display.o
 
 #Common objects
-OBJS_COMMON = parser.o
+OBJS_COMMON = parser.o debug.o
 
 # Dependencies
 display.o = display.h

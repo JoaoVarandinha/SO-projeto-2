@@ -1,5 +1,6 @@
 #include "board.h"
 #include "parser.h"
+#include "debug.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -7,8 +8,6 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <string.h>
-
-FILE * debugfile;
 
 // Helper private function to find and kill pacman at specific position
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
@@ -35,13 +34,6 @@ static inline int get_board_index(board_t* board, int x, int y) {
 // Helper private function for checking valid position
 static inline int is_valid_position(board_t* board, int x, int y) {
     return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
-}
-
-void sleep_ms(int milliseconds) {
-    struct timespec ts;
-    ts.tv_sec = milliseconds / 1000;
-    ts.tv_nsec = (milliseconds % 1000) * 1000000;
-    nanosleep(&ts, NULL);
 }
 
 int move_pacman(board_t* board, int pacman_index, command_t* command) {
@@ -277,7 +269,6 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             }
             break;
         default:
-            debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
             return INVALID_MOVE;
     }
     return result;
@@ -296,7 +287,6 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
 
     int result = move_ghost_charged_direction(board, ghost, direction, &new_x, &new_y);
     if (result == INVALID_MOVE) {
-        debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
         return INVALID_MOVE;
     }
 
@@ -439,7 +429,6 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
 }
 
 void kill_pacman(board_t* board, int pacman_index) {
-    debug("Killing %d pacman\n\n", pacman_index);
     pacman_t* pac = &board->pacmans[pacman_index];
 
 
@@ -519,26 +508,8 @@ void unload_level(board_t * board) {
     return;
 }
 
-void open_debug_file(char *filename) {
-    debugfile = fopen(filename, "w");
-}
-
-void close_debug_file() {
-    fclose(debugfile);
-}
-
-void debug(const char * format, ...) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(debugfile, format, args);
-    va_end(args);
-
-    fflush(debugfile);
-}
-
 void print_board(board_t *board) {
     if (!board || !board->board) {
-        debug("[%d] Board is empty or not initialized.\n", getpid());
         return;
     }
 
@@ -578,6 +549,4 @@ void print_board(board_t *board) {
     offset += snprintf(buffer + offset, sizeof(buffer) - offset, "==================\n");
 
     buffer[offset] = '\0';
-
-    debug("%s", buffer);
 }

@@ -73,9 +73,6 @@ typedef struct {
     int game_over;  // 1 if pacman has died, 0 otherwise
 } board_t;
 
-/*Makes the current thread sleep for 'int milliseconds' miliseconds*/
-void sleep_ms(int milliseconds);
-
 /*Processes a command for Pacman or Ghost(Monster)
 *_index - corresponding index in board's pacman_t/ghost_t array
 command - command to be processed*/
@@ -97,17 +94,6 @@ void load_level(board_t* board, char* filename);
 
 /*Unloads levels loaded by load_level*/
 void unload_level(board_t * board);
-
-// DEBUG FILE
-
-/*Opens the debug file*/
-void open_debug_file(char *filename);
-
-/*Closes the debug file*/
-void close_debug_file();
-
-/*Writes to the open debug file*/
-void debug(const char * format, ...);
 
 /*Writes the board and its contents to the open debug file*/
 void print_board(board_t* board);

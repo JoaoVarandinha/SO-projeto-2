@@ -3,6 +3,7 @@
 #include "protocol.h"
 #include "game.h"
 #include "parser.h"
+#include "debug.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -52,7 +53,6 @@ int send_board(Server_session* session) {
         perror("Error writing board data to request pipe - board");
         exit(EXIT_FAILURE);
     }
-    debug("Board update:\n%s\n", board_data);
     free(board_data);
     return 0;
 }
@@ -101,8 +101,6 @@ void *pacman_thread(void* arg) {
 
         play = &c;
 
-        debug("KEY %c\n", play->command);
-        
         if (play->command == 'Q') {
             *play_result = QUIT_GAME;
             return (void*) play_result;
@@ -201,11 +199,6 @@ int play_board_threads(Server_session* session) {
 
 int run_game(Server_session* session, const char* levels_dir) {
 
-    // Random seed for any random movements
-    srand((unsigned int)time(NULL));
-
-    open_debug_file("debug.log");
-    
     int accumulated_points = 0;
     int result;
     board_t* game_board = &session->board;
@@ -254,8 +247,6 @@ int run_game(Server_session* session, const char* levels_dir) {
     send_board(session);
 
     closedir(dir);
-
-    close_debug_file();
 
     if (result == QUIT_GAME) return 0;
     return 1;

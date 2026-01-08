@@ -1,6 +1,7 @@
 #include "game.h"
 #include "parser.h"
 #include "protocol.h"
+#include "debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,14 +25,15 @@ void sigusr1_handler(int signum) {
     sigusr1_flag = 1;
 }
 
-void print_current_highscores(int current_sessions) {
-    sigusr1_flag = 0;
-    int picked[manager.max_games];
-    for (int i = 0; i < manager.max_games; i++) picked[i] = 0;
+int read_server_pipe() {}
 
+void print_current_highscores(int current_sessions) {
+    int picked[manager.max_games];
     int amount_sessions = current_sessions < 5 ? current_sessions : 5;
 
-    char buf[MAX_INSTRUCTION_LENGTH] = "";
+    for (int i = 0; i < manager.max_games; i++) picked[i] = 0;
+
+    char buf[MAX_INSTRUCTION_LENGTH] = "===HIGHSCORE===";
 
     for (int i = 0; i < amount_sessions; i++) {
         int max_pos = -1, max_points = -1, max_id;
@@ -115,8 +117,6 @@ void* session_thread(void* arg) {
     }
 
     Server_session* session = (Server_session*) arg;
-    sem_init(&session->session_sem, 0, 0);
-    pthread_mutex_init(&session->session_lock, NULL);
 
     while (1) {
         sem_wait(&session->session_sem);
@@ -173,8 +173,11 @@ int main (int argc, char* argv[]) {
     struct sigaction sa;
     sa.sa_handler = sigusr1_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
+    sa.sa_flags = SA_RESTART; // SET TO 0 FIXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
     sigaction(SIGUSR1, &sa, NULL);
+
+    // Random seed for any random movements
+    srand((unsigned int)time(NULL));
 
     manager.levels_dir = argv[1];
     manager.max_games = atoi(argv[2]);
@@ -192,12 +195,15 @@ int main (int argc, char* argv[]) {
         perror("Error creating named pipe");
         exit(EXIT_FAILURE);
     }
-    int server_pipe_fd = open(manager.server_pipe_path, O_RDWR);
+    int server_pipe_fd = open(manager.server_pipe_path, O_RDONLY);
 
     pthread_t session_tid[manager.max_games];
 
     for (int i = 0; i < manager.max_games; i++) {
-        pthread_create(&session_tid[i], NULL, session_thread, &manager.all_sessions[i]);
+        Server_session* session = &manager.all_sessions[i];
+        sem_init(&session->session_sem, 0, 0);
+        pthread_mutex_init(&session->session_lock, NULL);
+        pthread_create(&session_tid[i], NULL, session_thread, session);
     }
 
 
@@ -207,11 +213,17 @@ int main (int argc, char* argv[]) {
             break;
         }
 
-        if (sigusr1_flag) print_current_highscores(check_ongoing_sessions()); //SIGUSR1 FLAG
+        if (sigusr1_flag) { //SIGUSR1 FLAG
+            sigusr1_flag = 0;
+            print_current_highscores(check_ongoing_sessions());
+        }
 
         while (sem_trywait(&manager.server_sem) != 0) {
             sleep_ms(500);
-            if (sigusr1_flag) print_current_highscores(check_ongoing_sessions()); //SIGUSR1 FLAG
+            if (sigusr1_flag) { //SIGUSR1 FLAG
+                sigusr1_flag = 0;
+                print_current_highscores(check_ongoing_sessions());
+            }
         }
         change_ongoing_sessions(1);
 
@@ -228,6 +240,11 @@ int main (int argc, char* argv[]) {
         read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH);
         read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH);
 
+        if (sigusr1_flag) { //SIGUSR1 FLAG
+            sigusr1_flag = 0;
+            print_current_highscores(check_ongoing_sessions());
+        }
+
         sem_post(&session->session_sem);
     }
 
@@ -239,7 +256,5 @@ int main (int argc, char* argv[]) {
     pthread_mutex_destroy(&manager.server_lock);
     free(manager.all_sessions);
     close(server_pipe_fd);
-    unlink(manager.server_pipe_path);
-
     return 0;
 }

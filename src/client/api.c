@@ -23,17 +23,16 @@ typedef struct {
 static Session session = {.id = -1};
 
 int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path) {
-    unlink(req_pipe_path);
-    unlink(notif_pipe_path);
     
+    unlink(req_pipe_path);
     if (mkfifo(req_pipe_path, 0666) == -1) {
         perror("Error creating request pipe");
         exit(EXIT_FAILURE);
     }
-
+    
+    unlink(notif_pipe_path);
     if (mkfifo(notif_pipe_path, 0666) == -1) {
         perror("Error creating notification pipe");
-        unlink(req_pipe_path);
         exit(EXIT_FAILURE);
     }
 
@@ -41,8 +40,6 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 
     if (server_pipe == -1) {
         perror("Error opening server pipe");
-        unlink(req_pipe_path);
-        unlink(notif_pipe_path);
         exit(EXIT_FAILURE);
     }
 
@@ -53,8 +50,6 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
         write(server_pipe, notif_pipe_path, MAX_PIPE_PATH_LENGTH) != MAX_PIPE_PATH_LENGTH) {
 
         perror("Error writing to server pipe - connect");
-        unlink(req_pipe_path);
-        unlink(notif_pipe_path);
         exit(EXIT_FAILURE);
     }
 
@@ -62,15 +57,10 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 
     if ((session.req_pipe = open(req_pipe_path, O_WRONLY)) == -1) {
         perror("Error opening req/notif pipes");
-        unlink(req_pipe_path);
-        unlink(notif_pipe_path);
         exit(EXIT_FAILURE);
     }
     if ((session.notif_pipe = open(notif_pipe_path, O_RDONLY)) == -1) {
         perror("Error opening req/notif pipes");
-        close(session.req_pipe);
-        unlink(req_pipe_path);
-        unlink(notif_pipe_path);
         exit(EXIT_FAILURE);
     }
 
@@ -113,8 +103,6 @@ int pacman_disconnect() {
 
     close(session.req_pipe);
     close(session.notif_pipe);
-    unlink(session.req_pipe_path);
-    unlink(session.notif_pipe_path);
 
     return 0;
 }
