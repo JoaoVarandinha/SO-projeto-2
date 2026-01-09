@@ -17,6 +17,7 @@
 #define HIGHSCORE_FILE "info_client_files/points.txt"
 
 static Server_manager manager;
+static Server_pipe_buf buffer;
 
 volatile sig_atomic_t sigusr1_flag = 0;
 
@@ -69,32 +70,25 @@ void print_current_highscores(int current_sessions) {
     close(high_fd);
 }
 
-Server_session* find_open_session() {
-    for (int i = 0; i < manager.max_games; i++) {
-        Server_session* session = &manager.all_sessions[i];
-        pthread_mutex_lock(&session->session_lock);
-        if (session->running == 0) {
-            session->running = 1;
-            pthread_mutex_unlock(&session->session_lock);
-            return session;
-        }
-        pthread_mutex_unlock(&session->session_lock);
-    }
-    perror("Error finding an open session");
-    exit(EXIT_FAILURE);
-}
-
 int check_ongoing_sessions() {
-    pthread_mutex_lock(&manager.server_lock);
-    int i = manager.ongoing_sessions;
-    pthread_mutex_unlock(&manager.server_lock);
+    pthread_mutex_lock(&buffer.buf_lock);
+    int i = buffer.ongoing_sessions;
+    pthread_mutex_unlock(&buffer.buf_lock);
     return i;
 }
 
 void change_ongoing_sessions(int i) {
-    pthread_mutex_lock(&manager.server_lock);
-    manager.ongoing_sessions += i;
-    pthread_mutex_unlock(&manager.server_lock);
+    pthread_mutex_lock(&buffer.buf_lock);
+    buffer.ongoing_sessions += i;
+    pthread_mutex_unlock(&buffer.buf_lock);
+}
+
+void start_session (Server_session* session) {
+    sem_wait(&buffer.available_sem);
+    change_ongoing_sessions(1);
+    pthread_mutex_lock(&session->session_lock);
+    session->running = 1;
+    pthread_mutex_unlock(&session->session_lock);
 }
 
 void end_session(Server_session* session) {
@@ -102,7 +96,7 @@ void end_session(Server_session* session) {
     session->running = 0;
     pthread_mutex_unlock(&session->session_lock);
     change_ongoing_sessions(-1);
-    sem_post(&manager.server_sem);
+    sem_post(&buffer.empty_sem);
 }
 
 void* session_thread(void* arg) {
@@ -117,11 +111,15 @@ void* session_thread(void* arg) {
     Server_session* session = (Server_session*) arg;
 
     while (1) {
-        sem_wait(&session->session_sem);
 
         if (0) { //END
             break;
         }
+
+        start_session(session);
+
+        strcpy(session->req_pipe_path, buffer.req.req_pipe_path);
+        strcpy(session->notif_pipe_path, buffer.req.notif_pipe_path);
 
         sscanf(session->req_pipe_path, "/tmp/%d_request", &session->id);
 
@@ -154,7 +152,6 @@ void* session_thread(void* arg) {
         end_session(session);
     }
 
-    sem_destroy(&session->session_sem);
     pthread_mutex_destroy(&session->session_lock);
 
     return NULL;
@@ -171,7 +168,7 @@ int main (int argc, char* argv[]) {
     struct sigaction sa;
     sa.sa_handler = sigusr1_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART; // SET TO 0 FIXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+    sa.sa_flags = SA_RESTART;
     sigaction(SIGUSR1, &sa, NULL);
 
     // Random seed for any random movements
@@ -180,13 +177,16 @@ int main (int argc, char* argv[]) {
     manager.levels_dir = argv[1];
     manager.max_games = atoi(argv[2]);
     manager.server_pipe_path = argv[3];
-    manager.ongoing_sessions = 0;
-    sem_init(&manager.server_sem, 0, manager.max_games);
     pthread_mutex_init(&manager.server_lock, NULL);
     if (!(manager.all_sessions = calloc(manager.max_games, sizeof(Server_session)))) {
         perror("Error allocating memory to manager");
         exit(EXIT_FAILURE);
     }
+
+    buffer.ongoing_sessions = 0;
+    pthread_mutex_init(&buffer.buf_lock, NULL);
+    sem_init(&buffer.empty_sem, 0, manager.max_games);
+    sem_init(&buffer.available_sem, 0, 0);
 
     unlink(manager.server_pipe_path);
     if (mkfifo(manager.server_pipe_path, 0666) != 0) {
@@ -199,7 +199,6 @@ int main (int argc, char* argv[]) {
 
     for (int i = 0; i < manager.max_games; i++) {
         Server_session* session = &manager.all_sessions[i];
-        sem_init(&session->session_sem, 0, 0);
         pthread_mutex_init(&session->session_lock, NULL);
         pthread_create(&session_tid[i], NULL, session_thread, session);
     }
@@ -216,16 +215,14 @@ int main (int argc, char* argv[]) {
             print_current_highscores(check_ongoing_sessions());
         }
 
-        while (sem_trywait(&manager.server_sem) != 0) {
+        while (sem_trywait(&buffer.empty_sem) != 0) {
             sleep_ms(500);
             if (sigusr1_flag) { //SIGUSR1 FLAG
                 sigusr1_flag = 0;
                 print_current_highscores(check_ongoing_sessions());
             }
         }
-        change_ongoing_sessions(1);
 
-        Server_session* session = find_open_session();
 
         char op_code;
         while (read_char(server_pipe_fd, &op_code, 1) == 0) {
@@ -240,13 +237,14 @@ int main (int argc, char* argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        while (read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
+
+        while (read_char(server_pipe_fd, buffer.req.req_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
             if (sigusr1_flag) { //SIGUSR1 FLAG
                 sigusr1_flag = 0;
                 print_current_highscores(check_ongoing_sessions());
             }
         }
-        while (read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
+        while (read_char(server_pipe_fd, buffer.req.notif_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
             if (sigusr1_flag) { //SIGUSR1 FLAG
                 sigusr1_flag = 0;
                 print_current_highscores(check_ongoing_sessions());
@@ -258,14 +256,15 @@ int main (int argc, char* argv[]) {
             print_current_highscores(check_ongoing_sessions());
         }
 
-        sem_post(&session->session_sem);
+        sem_post(&buffer.available_sem);
     }
 
 
     for (int i = 0; i < manager.max_games; i++) {
         pthread_join(session_tid[i], NULL);
     }
-    sem_destroy(&manager.server_sem);
+    sem_destroy(&buffer.available_sem);
+    sem_destroy(&buffer.empty_sem);
     pthread_mutex_destroy(&manager.server_lock);
     free(manager.all_sessions);
     close(server_pipe_fd);
