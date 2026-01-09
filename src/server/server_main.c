@@ -34,32 +34,34 @@ void print_current_highscores(int current_sessions) {
 
     char buf[MAX_INSTRUCTION_LENGTH] = "=== HIGHSCORE ===";
 
-    for (int i = 0; i < amount_sessions; i++) {
-        int max_pos = -1, max_points = -1, max_id;
+    if (amount_sessions != 0) {
+        for (int i = 0; i < amount_sessions; i++) {
+            int max_pos = -1, max_points = -1, max_id;
 
-        for (int j = 0; j < manager.max_games; j++) {
-            Server_session* ses = &manager.all_sessions[j];
-            pthread_rwlock_wrlock(&ses->board.board_lock);
-            if (!ses->running || picked[j]) continue;
+            for (int j = 0; j < manager.max_games; j++) {
+                Server_session* ses = &manager.all_sessions[j];
+                pthread_rwlock_wrlock(&ses->board.board_lock);
+                if (!ses->running || picked[j]) continue;
 
-            int pts = ses->board.pacmans[0].points;
-            if (max_points >= pts) continue;
+                int pts = ses->board.pacmans[0].points;
+                if (max_points >= pts) continue;
 
-            max_points = pts;
-            max_id = ses->id;
-            max_pos = j;
+                max_points = pts;
+                max_id = ses->id;
+                max_pos = j;
+            }
+            if (max_pos == -1) break;
+
+            picked[max_pos] = 1;
+
+            char temp[40];
+            sprintf(temp, "\n Id:%d - Points:%d", max_id, max_points);
+            strcat(buf, temp);
         }
-        if (max_pos == -1) break;
 
-        picked[max_pos] = 1;
-
-        char temp[40];
-        sprintf(temp, "\n Id:%d - Points:%d", max_id, max_points);
-        strcat(buf, temp);
-    }
-
-    for (int i = 0; i < manager.max_games; i++) {
-        pthread_rwlock_unlock(&manager.all_sessions[i].board.board_lock);
+        for (int i = 0; i < manager.max_games; i++) {
+            pthread_rwlock_unlock(&manager.all_sessions[i].board.board_lock);
+        }
     }
 
     int high_fd = open(HIGHSCORE_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
