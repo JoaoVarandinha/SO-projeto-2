@@ -190,22 +190,9 @@ void process_pacman_instruction(board_t* board, char* instruction) {
                     return;
                 }
             }
+            perror("Error reading pacman file - server");
             exit(EXIT_FAILURE);
         }
-        /* A leitura de movimentos é feita no cliente
-        default: {
-            command_t cmd;
-            cmd.command = instruction[0];
-            cmd.turns = 1;
-            if (instruction[0] == 'T') {
-                sscanf(instruction, "T %d", &cmd.turns);
-                cmd.turns_left = cmd.turns;
-            }
-
-            pac->moves[pac->n_moves++] = cmd;
-
-            return;
-        } */
     }
 }
 
