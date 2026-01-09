@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include <errno.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -43,15 +44,25 @@ int send_board(Server_session* session) {
         write(session->notif_pipe, &board->game_over, sizeof(int)) != sizeof(int) ||
         write(session->notif_pipe, &board->pacmans[0].points, sizeof(int)) != sizeof(int)) {
 
-        return -1;
+            if (errno == EPIPE) {
+                return -1;
+            } else {
+                perror("Error writing to notif pipe - board");
+                exit(EXIT_FAILURE);
+            }
     }
 
     int board_size = board->width*board->height;
     char* board_data = get_board_displayed(board);
 
     if (write(session->notif_pipe, board_data, board_size) != board_size) {
-        perror("Error writing board data to request pipe - board");
-        exit(EXIT_FAILURE);
+        free(board_data);
+        if (errno == EPIPE) {
+            return -1;
+        } else {
+            perror("Error writing to notif pipe - board");
+            exit(EXIT_FAILURE);
+        }
     }
     free(board_data);
     return 0;
@@ -223,6 +234,7 @@ int run_game(Server_session* session, const char* levels_dir) {
         //send_board(session);
 
         result = play_board_threads(session);
+        accumulated_points = game_board->pacmans[0].points;
 
         if (result == NEXT_LEVEL) {
             game_board->victory = 1;
@@ -236,8 +248,6 @@ int run_game(Server_session* session, const char* levels_dir) {
         if (result == QUIT_GAME) {
             break;
         }
-
-        accumulated_points = game_board->pacmans[0].points;
 
         print_board(game_board);
         unload_level(game_board);

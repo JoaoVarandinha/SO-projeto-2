@@ -25,15 +25,13 @@ void sigusr1_handler(int signum) {
     sigusr1_flag = 1;
 }
 
-int read_server_pipe() {}
-
 void print_current_highscores(int current_sessions) {
     int picked[manager.max_games];
     int amount_sessions = current_sessions < 5 ? current_sessions : 5;
 
     for (int i = 0; i < manager.max_games; i++) picked[i] = 0;
 
-    char buf[MAX_INSTRUCTION_LENGTH] = "===HIGHSCORE===";
+    char buf[MAX_INSTRUCTION_LENGTH] = "===HIGHSCORES===";
 
     for (int i = 0; i < amount_sessions; i++) {
         int max_pos = -1, max_points = -1, max_id;
@@ -55,7 +53,7 @@ void print_current_highscores(int current_sessions) {
         picked[max_pos] = 1;
 
         char temp[40];
-        sprintf(temp, "Id:%d - Points:%d\n", max_id, max_points);
+        sprintf(temp, "\n Id:%d - Points:%d", max_id, max_points);
         strcat(buf, temp);
     }
 
@@ -230,15 +228,30 @@ int main (int argc, char* argv[]) {
         Server_session* session = find_open_session();
 
         char op_code;
-        read_char(server_pipe_fd, &op_code, 1);
+        while (read_char(server_pipe_fd, &op_code, 1) == 0) {
+            if (sigusr1_flag) { //SIGUSR1 FLAG
+                sigusr1_flag = 0;
+                print_current_highscores(check_ongoing_sessions());
+            }
+        }
 
         if (op_code != OP_CODE_CONNECT) {
             perror("Error wrong op code in server pipe");
             exit(EXIT_FAILURE);
         }
 
-        read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH);
-        read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH);
+        while (read_char(server_pipe_fd, session->req_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
+            if (sigusr1_flag) { //SIGUSR1 FLAG
+                sigusr1_flag = 0;
+                print_current_highscores(check_ongoing_sessions());
+            }
+        }
+        while (read_char(server_pipe_fd, session->notif_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
+            if (sigusr1_flag) { //SIGUSR1 FLAG
+                sigusr1_flag = 0;
+                print_current_highscores(check_ongoing_sessions());
+            }
+        }
 
         if (sigusr1_flag) { //SIGUSR1 FLAG
             sigusr1_flag = 0;
