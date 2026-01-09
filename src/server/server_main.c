@@ -261,6 +261,7 @@ int main (int argc, char* argv[]) {
 
 
     for (int i = 0; i < manager.max_games; i++) {
+        pthread_mutex_destroy(&manager.all_sessions[0].session_lock);
         pthread_join(session_tid[i], NULL);
     }
     sem_destroy(&buffer.available_sem);

@@ -491,13 +491,11 @@ void load_level(board_t* board, char* filename) {
     board->victory = 0;
     board->game_over = 0;
     strcpy(board->level_name, filename);
-    pthread_rwlock_init(&board->board_lock, NULL);
 
     read_file(board, filename, LEVEL, 0);
 }
 
 void unload_level(board_t * board) {
-    pthread_rwlock_destroy(&board->board_lock);
     pthread_mutex_destroy(&board->pacmans[0].pac_lock);
     for (int i = 0; i < board->width * board->height; i++) {
         pthread_mutex_destroy(&board->board[i].pos_lock);
