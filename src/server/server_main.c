@@ -31,7 +31,7 @@ void print_current_highscores(int current_sessions) {
 
     for (int i = 0; i < manager.max_games; i++) picked[i] = 0;
 
-    char buf[MAX_INSTRUCTION_LENGTH] = "===HIGHSCORES===";
+    char buf[MAX_INSTRUCTION_LENGTH] = "=== HIGHSCORE ===";
 
     for (int i = 0; i < amount_sessions; i++) {
         int max_pos = -1, max_points = -1, max_id;
