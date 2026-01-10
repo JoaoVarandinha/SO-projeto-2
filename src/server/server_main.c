@@ -120,8 +120,10 @@ void* session_thread(void* arg) {
 
         start_session(session);
 
+        pthread_mutex_lock(&buffer.buf_lock);
         strcpy(session->req_pipe_path, buffer.req.req_pipe_path);
         strcpy(session->notif_pipe_path, buffer.req.notif_pipe_path);
+        pthread_mutex_unlock(&buffer.buf_lock);
 
         sscanf(session->req_pipe_path, "/tmp/%d_request", &session->id);
 
@@ -130,9 +132,7 @@ void* session_thread(void* arg) {
 
         char buf = '0';
         if (session->req_pipe == -1 || session->notif_pipe == -1) {
-            end_session(session);
             buf = '1';
-            continue;
         }
 
         char op_code = OP_CODE_CONNECT;
@@ -140,6 +140,11 @@ void* session_thread(void* arg) {
             write(session->notif_pipe, &buf, 1) != 1) {
             perror("Error writing to notif pipe - connect");
             exit(EXIT_FAILURE);
+        }
+
+        if (buf == '1') {
+            end_session(session);
+            continue;
         }
 
         int wait = run_game(session, manager.levels_dir);
@@ -228,6 +233,7 @@ int main (int argc, char* argv[]) {
 
         char op_code;
         while (read_char(server_pipe_fd, &op_code, 1) == 0) {
+            sleep_ms(500);
             if (sigusr1_flag) { //SIGUSR1 FLAG
                 sigusr1_flag = 0;
                 print_current_highscores(check_ongoing_sessions());
@@ -239,35 +245,21 @@ int main (int argc, char* argv[]) {
             exit(EXIT_FAILURE);
         }
 
-
-        while (read_char(server_pipe_fd, buffer.req.req_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
-            if (sigusr1_flag) { //SIGUSR1 FLAG
-                sigusr1_flag = 0;
-                print_current_highscores(check_ongoing_sessions());
-            }
-        }
-        while (read_char(server_pipe_fd, buffer.req.notif_pipe_path, MAX_PIPE_PATH_LENGTH) == 0) {
-            if (sigusr1_flag) { //SIGUSR1 FLAG
-                sigusr1_flag = 0;
-                print_current_highscores(check_ongoing_sessions());
-            }
-        }
-
-        if (sigusr1_flag) { //SIGUSR1 FLAG
-            sigusr1_flag = 0;
-            print_current_highscores(check_ongoing_sessions());
-        }
+        pthread_mutex_lock(&buffer.buf_lock);
+        read_char(server_pipe_fd, buffer.req.req_pipe_path, MAX_PIPE_PATH_LENGTH);
+        read_char(server_pipe_fd, buffer.req.notif_pipe_path, MAX_PIPE_PATH_LENGTH);
+        pthread_mutex_unlock(&buffer.buf_lock);
 
         sem_post(&buffer.available_sem);
     }
 
-
     for (int i = 0; i < manager.max_games; i++) {
         Server_session* session = &manager.all_sessions[0];
+        pthread_join(session_tid[i], NULL);
         pthread_rwlock_destroy(&session->board.board_lock);
         pthread_mutex_destroy(&session->session_lock);
-        pthread_join(session_tid[i], NULL);
     }
+
     sem_destroy(&buffer.available_sem);
     sem_destroy(&buffer.empty_sem);
     pthread_mutex_destroy(&buffer.buf_lock);
