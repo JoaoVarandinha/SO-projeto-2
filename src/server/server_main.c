@@ -201,6 +201,7 @@ int main (int argc, char* argv[]) {
     for (int i = 0; i < manager.max_games; i++) {
         Server_session* session = &manager.all_sessions[i];
         pthread_mutex_init(&session->session_lock, NULL);
+        pthread_rwlock_init(&session->board.board_lock, NULL);
         pthread_create(&session_tid[i], NULL, session_thread, session);
     }
 
@@ -262,7 +263,9 @@ int main (int argc, char* argv[]) {
 
 
     for (int i = 0; i < manager.max_games; i++) {
-        pthread_mutex_destroy(&manager.all_sessions[0].session_lock);
+        Server_session* session = &manager.all_sessions[0];
+        pthread_rwlock_destroy(&session->board.board_lock);
+        pthread_mutex_destroy(&session->session_lock);
         pthread_join(session_tid[i], NULL);
     }
     sem_destroy(&buffer.available_sem);
