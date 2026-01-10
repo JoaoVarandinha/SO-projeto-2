@@ -23,6 +23,6 @@ Thread Sanitizer stuff:
 sudo sysctl vm.mmap_rnd_bits=28
 
 bin/server info_files 3 /tmp/pipe_servidor 2> tsan_server_output.log
-bin/client 1 /tmp/pipe_servidor info_client_files/1.p 2> tsan_1_output.log
-bin/client 2 /tmp/pipe_servidor info_client_files/1.p 2> tsan_2_output.log
-bin/client 3 /tmp/pipe_servidor info_client_files/1.p 2> tsan_3_output.log
+bin/client 1 /tmp/pipe_servidor 1.p 2> tsan_1_output.log
+bin/client 2 /tmp/pipe_servidor 1.p 2> tsan_2_output.log
+bin/client 3 /tmp/pipe_servidor 1.p 2> tsan_3_output.log

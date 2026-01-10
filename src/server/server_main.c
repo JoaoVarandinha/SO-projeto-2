@@ -14,7 +14,7 @@
 #include <semaphore.h>
 #include <signal.h>
 
-#define HIGHSCORE_FILE "info_client_files/points.txt"
+#define HIGHSCORE_FILE "points.txt"
 
 static Server_manager manager;
 static Server_pipe_buf buffer;
