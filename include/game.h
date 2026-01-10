@@ -21,7 +21,6 @@ typedef struct {
     const char* levels_dir;
     int max_games;
     const char* server_pipe_path;
-    pthread_mutex_t server_lock;
     Server_session* all_sessions;
 } Server_manager;
 

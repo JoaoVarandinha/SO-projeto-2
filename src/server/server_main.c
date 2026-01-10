@@ -179,7 +179,6 @@ int main (int argc, char* argv[]) {
     manager.levels_dir = argv[1];
     manager.max_games = atoi(argv[2]);
     manager.server_pipe_path = argv[3];
-    pthread_mutex_init(&manager.server_lock, NULL);
     if (!(manager.all_sessions = calloc(manager.max_games, sizeof(Server_session)))) {
         perror("Error allocating memory to manager");
         exit(EXIT_FAILURE);
@@ -268,7 +267,7 @@ int main (int argc, char* argv[]) {
     }
     sem_destroy(&buffer.available_sem);
     sem_destroy(&buffer.empty_sem);
-    pthread_mutex_destroy(&manager.server_lock);
+    pthread_mutex_destroy(&buffer.buf_lock);
     free(manager.all_sessions);
     close(server_pipe_fd);
     return 0;
